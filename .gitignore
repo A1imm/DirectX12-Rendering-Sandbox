@@ -1,0 +1,74 @@
+# ============================
+# Visual Studio
+# ============================
+
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# ============================
+# Kompilacja / Build
+# ============================
+
+*.obj
+*.pdb
+*.idb
+*.pch
+*.ipch
+*.aps
+*.ncb
+*.log
+*.tlog
+*.ilk
+*.res
+*.rsp
+*.cache
+*.db
+*.exe
+*.dll
+*.lib
+*.exp
+
+# ============================
+# Build foldery
+# ============================
+
+[Bb]in/
+[Oo]bj/
+x64/
+x86/
+Debug*/
+Release*/
+*.VC.db
+*.VC.VC.opendb
+
+# ============================
+# CMake / Ninja (jeśli używasz)
+# ============================
+
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+build/
+
+# ============================
+# DirectX Shader Output
+# ============================
+
+*.cso
+*.pso
+
+# ============================
+# Pliki systemowe
+# ============================
+
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+*.DS_Store
+*.bak
+*.tmp
+*.swp
