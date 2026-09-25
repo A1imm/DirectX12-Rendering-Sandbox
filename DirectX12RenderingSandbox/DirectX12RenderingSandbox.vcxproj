@@ -13,9 +13,9 @@
   <PropertyGroup Label="Globals">
     <ProjectGuid>{89A9795C-7A10-4CED-AA30-035E47BB0D82}</ProjectGuid>
     <Keyword>Win32Proj</Keyword>
-    <RootNamespace>pwag01</RootNamespace>
+    <RootNamespace>DirectX12RenderingSandbox</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>pwag05</ProjectName>
+    <ProjectName>DirectX12RenderingSandbox</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
