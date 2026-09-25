@@ -387,17 +387,67 @@ void RenderWidget::BuildRootSignature()
 
 void RenderWidget::CompileShaders()
 {
-	m_vertexShaderByteCode = DirectXHelper::CompileShader(L"shader.fx", nullptr, "VS_Main", "vs_5_0");
-	assert(m_vertexShaderByteCode);
+    // Basic pipeline
+    m_basicVertexShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Basic.hlsl",
+            nullptr,
+            "VS_Main",
+            "vs_5_0"
+        );
 
-	m_pixelShaderByteCode = DirectXHelper::CompileShader(L"shader.fx", nullptr, "PS_Main", "ps_5_0");
-	assert(m_pixelShaderByteCode);
+    assert(m_basicVertexShaderByteCode);
 
-	m_hullShaderByteCode = DirectXHelper::CompileShader(L"shader.fx", nullptr, "HS_Main", "hs_5_0");
-	assert(m_hullShaderByteCode);
+    m_basicPixelShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Basic.hlsl",
+            nullptr,
+            "PS_Main",
+            "ps_5_0"
+        );
 
-	m_domainShaderByteCode = DirectXHelper::CompileShader(L"shader.fx", nullptr, "DS_Main", "ds_5_0");
-	assert(m_domainShaderByteCode);
+    assert(m_basicPixelShaderByteCode);
+
+    // Tessellation pipeline
+    m_tessVertexShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Tessellation.hlsl",
+            nullptr,
+            "VS_Main",
+            "vs_5_0"
+        );
+
+    assert(m_tessVertexShaderByteCode);
+
+    m_tessPixelShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Tessellation.hlsl",
+            nullptr,
+            "PS_Main",
+            "ps_5_0"
+        );
+
+    assert(m_tessPixelShaderByteCode);
+
+    m_hullShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Tessellation.hlsl",
+            nullptr,
+            "HS_Main",
+            "hs_5_0"
+        );
+
+    assert(m_hullShaderByteCode);
+
+    m_domainShaderByteCode =
+        DirectXHelper::CompileShader(
+            L"Tessellation.hlsl",
+            nullptr,
+            "DS_Main",
+            "ds_5_0"
+        );
+
+    assert(m_domainShaderByteCode);
 }
 
 void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
@@ -547,13 +597,13 @@ void RenderWidget::CreateGraphicPipeline()
 	psoDesc.pRootSignature = m_rootSignature.Get();
 	psoDesc.VS =
 	{
-		reinterpret_cast<BYTE*>(m_vertexShaderByteCode->GetBufferPointer()),
-		m_vertexShaderByteCode->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_tessVertexShaderByteCode->GetBufferPointer()),
+		m_tessVertexShaderByteCode->GetBufferSize()
 	};
 	psoDesc.PS =
 	{
-		reinterpret_cast<BYTE*>(m_pixelShaderByteCode->GetBufferPointer()),
-		m_pixelShaderByteCode->GetBufferSize()
+		reinterpret_cast<BYTE*>(m_tessPixelShaderByteCode->GetBufferPointer()),
+		m_tessPixelShaderByteCode->GetBufferSize()
 	};
 	psoDesc.HS =
 	{

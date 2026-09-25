@@ -52,7 +52,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <CopyFileToFolders Include="shader.fx">
+    <CopyFileToFolders Include="Tessellation.hlsl">
+      <Filter>Resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="Basic.hlsl">
       <Filter>Resources</Filter>
     </CopyFileToFolders>
     <CopyFileToFolders Include="height_map.png">

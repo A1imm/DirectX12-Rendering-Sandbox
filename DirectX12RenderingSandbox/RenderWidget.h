@@ -71,8 +71,14 @@ private:
 
     //Shaders
     void CompileShaders();
-    Microsoft::WRL::ComPtr<ID3DBlob> m_vertexShaderByteCode;
-    Microsoft::WRL::ComPtr<ID3DBlob> m_pixelShaderByteCode;
+
+    // Basic pipeline
+    Microsoft::WRL::ComPtr<ID3DBlob> m_basicVertexShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_basicPixelShaderByteCode;
+
+    // Tessellation pipeline
+    Microsoft::WRL::ComPtr<ID3DBlob> m_tessVertexShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_tessPixelShaderByteCode;
     Microsoft::WRL::ComPtr<ID3DBlob> m_hullShaderByteCode;
     Microsoft::WRL::ComPtr<ID3DBlob> m_domainShaderByteCode;
 
