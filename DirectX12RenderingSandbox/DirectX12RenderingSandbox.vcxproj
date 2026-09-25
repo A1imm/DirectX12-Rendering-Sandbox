@@ -43,14 +43,14 @@
   <PropertyGroup Label="UserMacros" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <TargetName>$(ProjectName)d</TargetName>
-    <IncludePath>.\..\external\Inc;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0\ucrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0\um;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22000.0\ucrt\x64;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\..\external\Inc;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
     <LinkIncremental>true</LinkIncremental>
     <SourcePath>$(SourcePath)</SourcePath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
-    <IncludePath>.\..\external\Inc;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0\ucrt;C:\Program Files (x86)\Windows Kits\10\Include\10.0.22000.0\um;$(IncludePath)</IncludePath>
-    <LibraryPath>C:\Program Files (x86)\Windows Kits\10\Lib\10.0.22000.0\ucrt\x64;C:\Program Files %28x86%29\SDL-1.2.15\lib\x86;$(LibraryPath)</LibraryPath>
+    <IncludePath>.\..\external\Inc;$(IncludePath)</IncludePath>
+    <LibraryPath>$(LibraryPath)</LibraryPath>
     <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -103,16 +103,7 @@
     <ClInclude Include="..\external\inc\DDSTextureLoader.h" />
     <ClInclude Include="common.h" />
     <ClInclude Include="GeometryHelper.h" />
-    <ClInclude Include="RenderWidget.h">
-      <Command Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">"$(QTDIR)bin\moc.exe"  "%(FullPath)" -o ".\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DQT_LARGEFILE_SUPPORT -DQT_CORE_LIB -DQT_GUI_LIB "-I." "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I."</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">MOC-ing "%(FileName)"</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">.\moc_%(Filename).cpp</Outputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(QTDIR)bin\moc.exe;%(FullPath)</AdditionalInputs>
-      <Command Condition="'$(Configuration)|$(Platform)'=='Release|x64'">"$(QTDIR)bin\moc.exe"  "%(FullPath)" -o ".\moc_%(Filename).cpp"  -DUNICODE -DWIN32 -DQT_LARGEFILE_SUPPORT -DQT_CORE_LIB -DQT_GUI_LIB "-I." "-I$(QTDIR)\include" "-I$(QTDIR)\include\QtCore" "-I$(QTDIR)\include\QtGui" "-I."</Command>
-      <Message Condition="'$(Configuration)|$(Platform)'=='Release|x64'">MOC-ing "%(FileName)"</Message>
-      <Outputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">.\moc_%(Filename).cpp</Outputs>
-      <AdditionalInputs Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(QTDIR)bin\moc.exe;%(FullPath)</AdditionalInputs>
-    </ClInclude>
+    <ClInclude Include="RenderWidget.h" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="System.h" />
