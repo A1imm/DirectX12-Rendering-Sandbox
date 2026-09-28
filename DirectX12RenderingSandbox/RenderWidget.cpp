@@ -33,7 +33,7 @@ void RenderWidget::Initialize()
 
 	//3. Initialize Graphic Pipeline
 	BuildRootSignature();
-	CreateGraphicPipeline();
+	CreateGraphicPipelines();
 
 	//4. Execute all commands
 	ExecuteCommandList();
@@ -498,10 +498,105 @@ void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
 		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
+void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
+{
+	const UINT ibByteSize =
+		static_cast<UINT>(
+			indices.size() * sizeof(std::uint16_t)
+			);
+
+	IndexBuffer.IndexBufferByteSize =
+		ibByteSize;
+
+	IndexBuffer.NumberOfIndices =
+		static_cast<UINT>(indices.size());
+
+	// GPU buffer
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(
+				D3D12_HEAP_TYPE_DEFAULT
+			),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(
+				ibByteSize
+			),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(
+				&IndexBuffer.IndexBufferGPU
+			)
+		)
+	);
+
+	IndexBuffer.IndexBufferGPU->SetName(
+		L"IndexBufferGPU"
+	);
+
+	// Upload buffer
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(
+				D3D12_HEAP_TYPE_UPLOAD
+			),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(
+				ibByteSize
+			),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(
+				&IndexBuffer.IndexBufferUploader
+			)
+		)
+	);
+
+	IndexBuffer.IndexBufferUploader->SetName(
+		L"IndexBufferUploader"
+	);
+
+	D3D12_SUBRESOURCE_DATA indexData = {};
+
+	indexData.pData = indices.data();
+	indexData.RowPitch = ibByteSize;
+	indexData.SlicePitch = ibByteSize;
+
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			IndexBuffer.IndexBufferGPU.Get(),
+			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_COPY_DEST
+		)
+	);
+
+	UpdateSubresources<1>(
+		m_commandList.Get(),
+		IndexBuffer.IndexBufferGPU.Get(),
+		IndexBuffer.IndexBufferUploader.Get(),
+		0,
+		0,
+		1,
+		&indexData
+	);
+
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			IndexBuffer.IndexBufferGPU.Get(),
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_GENERIC_READ
+		)
+	);
+}
+
 void RenderWidget::LoadGeometry()
 {
 	const auto vertices = Geometry::CreateQuadPatchGeometry();
+	const auto indices = Geometry::CreateQuadIndices();
+
 	LoadVertexBuffer(vertices);
+	LoadIndexBuffer(indices);
 }
 
 void RenderWidget::LoadTexture(const wchar_t* path)
@@ -584,51 +679,173 @@ void RenderWidget::LoadTexture(const wchar_t* path)
 	m_dxDevice->CreateShaderResourceView(m_textureResource.Get(), &srvDesc, hDescriptor);
 }
 
-void RenderWidget::CreateGraphicPipeline()
+void RenderWidget::CreateGraphicPipelines()
 {
-	std::vector<D3D12_INPUT_ELEMENT_DESC> m_inputLayout = {
-	{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-	};
+    std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
+    {
+        {
+            "POSITION",
+            0,
+            DXGI_FORMAT_R32G32B32_FLOAT,
+            0,
+            0,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+            0
+        },
+        {
+            "TEXCOORD",
+            0,
+            DXGI_FORMAT_R32G32_FLOAT,
+            0,
+            12,
+            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+            0
+        }
+    };
 
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc;
-	ZeroMemory(&psoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	psoDesc.InputLayout = { m_inputLayout.data(), (UINT)m_inputLayout.size() };
-	psoDesc.pRootSignature = m_rootSignature.Get();
-	psoDesc.VS =
-	{
-		reinterpret_cast<BYTE*>(m_tessVertexShaderByteCode->GetBufferPointer()),
-		m_tessVertexShaderByteCode->GetBufferSize()
-	};
-	psoDesc.PS =
-	{
-		reinterpret_cast<BYTE*>(m_tessPixelShaderByteCode->GetBufferPointer()),
-		m_tessPixelShaderByteCode->GetBufferSize()
-	};
-	psoDesc.HS =
-	{
-		reinterpret_cast<BYTE*>(m_hullShaderByteCode->GetBufferPointer()),
-		m_hullShaderByteCode->GetBufferSize()
-	};
-	psoDesc.DS =
-	{
-		reinterpret_cast<BYTE*>(m_domainShaderByteCode->GetBufferPointer()),
-		m_domainShaderByteCode->GetBufferSize()
-	};
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC basicPsoDesc = {};
 
-	psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	psoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	psoDesc.RasterizerState.CullMode  = D3D12_CULL_MODE_NONE;
-	psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
-	psoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
-	psoDesc.SampleMask = UINT_MAX;
-	psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
-	psoDesc.NumRenderTargets = 1;
-	psoDesc.RTVFormats[0] = BackBufferFormat;
-	psoDesc.SampleDesc.Count = 1;
-	psoDesc.SampleDesc.Quality = 0;
-	psoDesc.DSVFormat = DepthStencilFormat;
-	ThrowIfFailed(m_dxDevice->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_pipelineState)));
+    basicPsoDesc.InputLayout =
+    {
+        inputLayout.data(),
+        static_cast<UINT>(inputLayout.size())
+    };
+
+    basicPsoDesc.pRootSignature = m_rootSignature.Get();
+
+    basicPsoDesc.VS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_basicVertexShaderByteCode->GetBufferPointer()
+        ),
+        m_basicVertexShaderByteCode->GetBufferSize()
+    };
+
+    basicPsoDesc.PS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_basicPixelShaderByteCode->GetBufferPointer()
+        ),
+        m_basicPixelShaderByteCode->GetBufferSize()
+    };
+
+    basicPsoDesc.RasterizerState =
+        CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+    basicPsoDesc.RasterizerState.FillMode =
+        D3D12_FILL_MODE_SOLID;
+
+    basicPsoDesc.RasterizerState.CullMode =
+        D3D12_CULL_MODE_NONE;
+
+    basicPsoDesc.BlendState =
+        CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
+    basicPsoDesc.DepthStencilState =
+        CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+    basicPsoDesc.SampleMask = UINT_MAX;
+
+    basicPsoDesc.PrimitiveTopologyType =
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+    basicPsoDesc.NumRenderTargets = 1;
+
+    basicPsoDesc.RTVFormats[0] =
+        BackBufferFormat;
+
+    basicPsoDesc.SampleDesc.Count = 1;
+    basicPsoDesc.SampleDesc.Quality = 0;
+
+    basicPsoDesc.DSVFormat =
+        DepthStencilFormat;
+
+    ThrowIfFailed(
+        m_dxDevice->CreateGraphicsPipelineState(
+            &basicPsoDesc,
+            IID_PPV_ARGS(&m_basicPipelineState)
+        )
+    );
+
+    D3D12_GRAPHICS_PIPELINE_STATE_DESC tessPsoDesc = {};
+
+    tessPsoDesc.InputLayout =
+    {
+        inputLayout.data(),
+        static_cast<UINT>(inputLayout.size())
+    };
+
+    tessPsoDesc.pRootSignature = m_rootSignature.Get();
+
+    tessPsoDesc.VS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_tessVertexShaderByteCode->GetBufferPointer()
+        ),
+        m_tessVertexShaderByteCode->GetBufferSize()
+    };
+
+    tessPsoDesc.PS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_tessPixelShaderByteCode->GetBufferPointer()
+        ),
+        m_tessPixelShaderByteCode->GetBufferSize()
+    };
+
+    tessPsoDesc.HS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_hullShaderByteCode->GetBufferPointer()
+        ),
+        m_hullShaderByteCode->GetBufferSize()
+    };
+
+    tessPsoDesc.DS =
+    {
+        reinterpret_cast<BYTE*>(
+            m_domainShaderByteCode->GetBufferPointer()
+        ),
+        m_domainShaderByteCode->GetBufferSize()
+    };
+
+    tessPsoDesc.RasterizerState =
+        CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+
+    tessPsoDesc.RasterizerState.FillMode =
+        D3D12_FILL_MODE_WIREFRAME;
+
+    tessPsoDesc.RasterizerState.CullMode =
+        D3D12_CULL_MODE_NONE;
+
+    tessPsoDesc.BlendState =
+        CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+
+    tessPsoDesc.DepthStencilState =
+        CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+
+    tessPsoDesc.SampleMask = UINT_MAX;
+
+    tessPsoDesc.PrimitiveTopologyType =
+        D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+
+    tessPsoDesc.NumRenderTargets = 1;
+
+    tessPsoDesc.RTVFormats[0] =
+        BackBufferFormat;
+
+    tessPsoDesc.SampleDesc.Count = 1;
+    tessPsoDesc.SampleDesc.Quality = 0;
+
+    tessPsoDesc.DSVFormat =
+        DepthStencilFormat;
+
+    ThrowIfFailed(
+        m_dxDevice->CreateGraphicsPipelineState(
+            &tessPsoDesc,
+            IID_PPV_ARGS(&m_tessellationPipelineState)
+        )
+    );
 }
 
 void RenderWidget::UpdateWorldViewProjectionBuffer()
@@ -651,10 +868,24 @@ void RenderWidget::UpdateWorldViewProjectionBuffer()
 
 }
 
+void RenderWidget::SetRenderingMode(RenderingMode mode)
+{
+    m_renderingMode = mode;
+}
+
 void RenderWidget::Draw()
 {
 	m_directCmdListAlloc->Reset();
-	ResetCommandList(m_pipelineState.Get());
+	ID3D12PipelineState* activePipelineState = nullptr;
+	if (m_renderingMode == RenderingMode::Basic)
+    {
+        activePipelineState = m_basicPipelineState.Get();
+    }
+    else
+    {
+        activePipelineState = m_tessellationPipelineState.Get();
+    }
+	ResetCommandList(activePipelineState);
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
@@ -674,7 +905,21 @@ void RenderWidget::Draw()
 
 	// Input Assembly stage
 	m_commandList->IASetVertexBuffers(0, 1, &VertexBuffer.VertexBufferView());
-	m_commandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST);
+	if (m_renderingMode == RenderingMode::Basic)
+	{
+		m_commandList->IASetPrimitiveTopology(
+			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+		);
+		m_commandList->IASetIndexBuffer(
+			&IndexBuffer.IndexBufferView()
+		);
+	}
+	else
+	{
+		m_commandList->IASetPrimitiveTopology(
+			D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST
+		);
+	}
 
 
 	// Rasterizer stage
@@ -685,9 +930,25 @@ void RenderWidget::Draw()
 	m_commandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &depthStencilViewHandle);
 
 	// Draw Geometry
-	m_commandList->DrawInstanced(
-		VertexBuffer.NumberOfVertices,
-		1, 0, 0);
+	if (m_renderingMode == RenderingMode::Basic)
+	{
+		m_commandList->DrawIndexedInstanced(
+			IndexBuffer.NumberOfIndices,
+			1,
+			0,
+			0,
+			0
+		);
+	}
+	else
+	{
+		m_commandList->DrawInstanced(
+			VertexBuffer.NumberOfVertices,
+			1,
+			0,
+			0
+		);
+	}
 
 	// Indicate a state transition on the resource usage.
 	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),

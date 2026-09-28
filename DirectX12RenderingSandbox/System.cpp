@@ -55,12 +55,36 @@ LRESULT CALLBACK System::MessageHandler(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 
 		case WM_KEYDOWN:
 		{
-			//Close on ESC
 			if (wparam == VK_ESCAPE)
 			{
 				PostQuitMessage(0);
 				return 0;
 			}
+
+			if (m_renderWidget != nullptr)
+			{
+				if (wparam == '1')
+				{
+					m_renderWidget->SetRenderingMode(
+						RenderingMode::Basic
+					);
+
+					OutputDebugStringA(
+						"Rendering mode: Basic\n"
+					);
+				}
+				else if (wparam == '2')
+				{
+					m_renderWidget->SetRenderingMode(
+						RenderingMode::Tessellation
+					);
+
+					OutputDebugStringA(
+						"Rendering mode: Tessellation\n"
+					);
+				}
+			}
+
 			break;
 		}
 

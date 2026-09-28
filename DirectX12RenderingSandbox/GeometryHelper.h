@@ -12,6 +12,7 @@ namespace Geometry
 		DirectX::XMFLOAT2 UV;
 	};
 	using VertexBuffer = std::vector<Vertex>;
+	using IndexBuffer = std::vector<std::uint16_t>;
 
 	inline VertexBuffer CreateQuadPatchGeometry()
 	{
@@ -22,6 +23,15 @@ namespace Geometry
 		vertices.emplace_back(DirectX::XMFLOAT3(1.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(0.0, 0.0));	
 
 		return std::move(vertices);
+	}
+
+	inline IndexBuffer CreateQuadIndices()
+	{
+		return
+		{
+			0, 1, 2,
+			0, 2, 3
+		};
 	}
 
 	inline DirectX::XMFLOAT4X4 Identity4x4()

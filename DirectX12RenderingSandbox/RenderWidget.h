@@ -9,6 +9,12 @@ struct ObjectConstants
     DirectX::XMFLOAT3 camera;
 };
 
+enum class RenderingMode
+{
+    Basic,
+    Tessellation
+};
+
 class RenderWidget
 {
     
@@ -18,6 +24,7 @@ public:
     void Initialize();
     void Draw();
     void Resize(int width, int height);
+    void SetRenderingMode(RenderingMode mode);
     Geometry::Camera& GetCamera() {
         return m_camera;
     }
@@ -82,11 +89,14 @@ private:
     Microsoft::WRL::ComPtr<ID3DBlob> m_hullShaderByteCode;
     Microsoft::WRL::ComPtr<ID3DBlob> m_domainShaderByteCode;
 
-    //Pipeline state and Root signature
+    // Pipeline states and Root signature
     void BuildRootSignature();
-    void CreateGraphicPipeline();
+    void CreateGraphicPipelines();
+
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
-    Microsoft::WRL::ComPtr< ID3D12PipelineState> m_pipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_basicPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
+    RenderingMode m_renderingMode = RenderingMode::Tessellation;
 
 
     //Textures
@@ -104,6 +114,7 @@ private:
     //Geometry, Camera, Vertex and Index buffer
     void LoadGeometry();
     void LoadVertexBuffer(const Geometry::VertexBuffer& vertices);
+    void LoadIndexBuffer(const Geometry::IndexBuffer& indices);
     Geometry::Camera m_camera;
 
     struct
@@ -124,6 +135,24 @@ private:
             return vbv;
         }
     }VertexBuffer;
+
+    struct
+    {
+        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
+        UINT IndexBufferByteSize = 0;
+        UINT NumberOfIndices = 0;
+
+        D3D12_INDEX_BUFFER_VIEW IndexBufferView() const
+        {
+            D3D12_INDEX_BUFFER_VIEW ibv;
+            ibv.BufferLocation =  IndexBufferGPU->GetGPUVirtualAddress();
+            ibv.Format = DXGI_FORMAT_R16_UINT;
+            ibv.SizeInBytes = IndexBufferByteSize;
+
+            return ibv;
+        }
+    }IndexBuffer;
 };
 
 #endif

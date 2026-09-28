@@ -31,7 +31,7 @@ private:
 	POINT m_lastMousePos{0,0};
 
 private:
-	const LPCWSTR m_applicationName = L"PWAG";
+	const LPCWSTR m_applicationName = L"DirectX 12 Rendering Sandbox";
 	HINSTANCE m_hinstance =0;
 	HWND m_hwnd = 0;
 	std::unique_ptr<RenderWidget> m_renderWidget;
