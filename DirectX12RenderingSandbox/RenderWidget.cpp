@@ -820,35 +820,66 @@ void RenderWidget::LoadTexture(
 
 void RenderWidget::CreateGraphicPipelines()
 {
-    std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
-    {
-        {
-            "POSITION",
-            0,
-            DXGI_FORMAT_R32G32B32_FLOAT,
-            0,
-            0,
-            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-            0
-        },
-        {
-            "TEXCOORD",
-            0,
-            DXGI_FORMAT_R32G32_FLOAT,
-            0,
-            12,
-            D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
-            0
-        }
-    };
+	std::vector<D3D12_INPUT_ELEMENT_DESC> basicInputLayout =
+	{
+		{
+			"POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			0,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		},
+		{
+			"NORMAL",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			12,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		},
+		{
+			"TEXCOORD",
+			0,
+			DXGI_FORMAT_R32G32_FLOAT,
+			0,
+			24,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		}
+	};
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC> tessellationInputLayout =
+	{
+		{
+			"POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			0,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		},
+		{
+			"TEXCOORD",
+			0,
+			DXGI_FORMAT_R32G32_FLOAT,
+			0,
+			24,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		}
+	};
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC basicPsoDesc = {};
 
-    basicPsoDesc.InputLayout =
-    {
-        inputLayout.data(),
-        static_cast<UINT>(inputLayout.size())
-    };
+	basicPsoDesc.InputLayout =
+	{
+		basicInputLayout.data(),
+		static_cast<UINT>(basicInputLayout.size())
+	};
 
     basicPsoDesc.pRootSignature = m_rootSignature.Get();
 
@@ -908,11 +939,11 @@ void RenderWidget::CreateGraphicPipelines()
 
     D3D12_GRAPHICS_PIPELINE_STATE_DESC tessPsoDesc = {};
 
-    tessPsoDesc.InputLayout =
-    {
-        inputLayout.data(),
-        static_cast<UINT>(inputLayout.size())
-    };
+	tessPsoDesc.InputLayout =
+	{
+		tessellationInputLayout.data(),
+		static_cast<UINT>(tessellationInputLayout.size())
+	};
 
     tessPsoDesc.pRootSignature = m_rootSignature.Get();
 
