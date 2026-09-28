@@ -330,19 +330,40 @@ void RenderWidget::UpdateViewport(unsigned int width, unsigned int height)
 
 void RenderWidget::CreateWorldViewProjectionMatrixBuffer()
 {
-	//constant  buffer
-	const auto elementByteSize = DirectXHelper::CalcConstantBufferByteSize( sizeof(ObjectConstants));
-	const auto elements = 1;
+	m_objectConstantBufferByteSize =
+		DirectXHelper::CalcConstantBufferByteSize(
+			sizeof(ObjectConstants)
+		);
 
-	ThrowIfFailed(m_dxDevice->CreateCommittedResource(
-		&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(elementByteSize * elements),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_cbWVProjectionMatrix)));
+	constexpr UINT objectCount = 2;
 
-	ThrowIfFailed(m_cbWVProjectionMatrix->Map(0, nullptr, reinterpret_cast<void**>(&m_mappedData)));
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(
+				D3D12_HEAP_TYPE_UPLOAD
+			),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(
+				m_objectConstantBufferByteSize *
+				objectCount
+			),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(
+				&m_cbWVProjectionMatrix
+			)
+		)
+	);
+
+	ThrowIfFailed(
+		m_cbWVProjectionMatrix->Map(
+			0,
+			nullptr,
+			reinterpret_cast<void**>(
+				&m_mappedData
+				)
+		)
+	);
 }
 
 
@@ -869,129 +890,277 @@ void RenderWidget::CreateGraphicPipelines()
     );
 }
 
-void RenderWidget::UpdateWorldViewProjectionBuffer()
+void RenderWidget::UpdateObjectConstantBuffer(
+	UINT objectIndex,
+	const DirectX::XMMATRIX& world)
 {
-	DirectX::XMMATRIX world = DirectX::XMLoadFloat4x4(&Geometry::Identity4x4());
+	DirectX::XMMATRIX view =
+		m_camera.GetViewMatrix();
 
-	m_camera.UpdateViewMatrix();
-	DirectX::XMMATRIX view = m_camera.GetViewMatrix();
-	DirectX::XMMATRIX proj = m_camera.GetProjectionMatrix();
-	DirectX::XMMATRIX worldViewProj = world * view * proj;
+	DirectX::XMMATRIX projection =
+		m_camera.GetProjectionMatrix();
 
-	// Update the constant buffer with the latest worldViewProj matrix.
-	ObjectConstants objConstants;
-	XMStoreFloat4x4(&objConstants.WorldViewProj, XMMatrixTranspose(worldViewProj));
-	objConstants.camera = m_camera.GetCameraPos();
+	DirectX::XMMATRIX worldViewProjection =
+		world * view * projection;
 
+	ObjectConstants constants;
 
-	//Upload buffer
-	memcpy(m_mappedData, &objConstants, sizeof(objConstants));
+	DirectX::XMStoreFloat4x4(
+		&constants.World,
+		DirectX::XMMatrixTranspose(world)
+	);
 
+	DirectX::XMStoreFloat4x4(
+		&constants.WorldViewProj,
+		DirectX::XMMatrixTranspose(
+			worldViewProjection
+		)
+	);
+
+	constants.CameraPosition =
+		m_camera.GetCameraPos();
+
+	BYTE* destination =
+		m_mappedData +
+		objectIndex *
+		m_objectConstantBufferByteSize;
+
+	memcpy(
+		destination,
+		&constants,
+		sizeof(ObjectConstants)
+	);
 }
 
-void RenderWidget::SetRenderingMode(RenderingMode mode)
+void RenderWidget::UpdateWorldViewProjectionBuffer()
 {
-    m_renderingMode = mode;
+	m_camera.UpdateViewMatrix();
+
+	// Cube: left side of the scene
+	DirectX::XMMATRIX cubeWorld =
+		DirectX::XMMatrixScaling(
+			0.65f,
+			0.65f,
+			0.65f
+		)
+		*
+		DirectX::XMMatrixTranslation(
+			-1.2f,
+			0.5f,
+			0.0f
+		);
+
+	// Tessellated terrain: right/lower side
+	DirectX::XMMATRIX terrainWorld =
+		DirectX::XMMatrixScaling(
+			1.2f,
+			1.2f,
+			1.2f
+		)
+		*
+		DirectX::XMMatrixTranslation(
+			1.2f,
+			-0.7f,
+			0.0f
+		);
+
+	UpdateObjectConstantBuffer(
+		0,
+		cubeWorld
+	);
+
+	UpdateObjectConstantBuffer(
+		1,
+		terrainWorld
+	);
 }
 
 void RenderWidget::Draw()
 {
 	m_directCmdListAlloc->Reset();
-	ID3D12PipelineState* activePipelineState = nullptr;
-	if (m_renderingMode == RenderingMode::Basic)
-    {
-        activePipelineState = m_basicPipelineState.Get();
-    }
-    else
-    {
-        activePipelineState = m_tessellationPipelineState.Get();
-    }
-	ResetCommandList(activePipelineState);
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	// Clear the back buffer and the depth buffer.
-	auto depthStencilViewHandle = m_dsvDescriptorHeap->GetCPUDescriptorHandleForHeapStart();
-	m_commandList->ClearRenderTargetView(GetCurrentBackBufferView(), DirectX::Colors::LightSteelBlue, 0, nullptr);
-	m_commandList->ClearDepthStencilView(depthStencilViewHandle, D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+	ResetCommandList(
+		m_basicPipelineState.Get()
+	);
 
-	// Set root signature
-	ID3D12DescriptorHeap* descriptorHeaps[] = { m_srvDescriptorHeap.Get() };
-	m_commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-	m_commandList->SetGraphicsRootConstantBufferView(0, m_cbWVProjectionMatrix->GetGPUVirtualAddress());
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT,
+			D3D12_RESOURCE_STATE_RENDER_TARGET
+		)
+	);
 
-	CD3DX12_GPU_DESCRIPTOR_HANDLE textureDescriptorHandle1(m_srvDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	m_commandList->SetGraphicsRootDescriptorTable(1, textureDescriptorHandle1);
+	auto depthStencilViewHandle =
+		m_dsvDescriptorHeap
+		->GetCPUDescriptorHandleForHeapStart();
 
-	// Input Assembly stage
-	if (m_renderingMode == RenderingMode::Basic)
+	m_commandList->ClearRenderTargetView(
+		GetCurrentBackBufferView(),
+		DirectX::Colors::LightSteelBlue,
+		0,
+		nullptr
+	);
+
+	m_commandList->ClearDepthStencilView(
+		depthStencilViewHandle,
+		D3D12_CLEAR_FLAG_DEPTH |
+		D3D12_CLEAR_FLAG_STENCIL,
+		1.0f,
+		0,
+		0,
+		nullptr
+	);
+
+	// Common state
+	ID3D12DescriptorHeap* descriptorHeaps[] =
 	{
-		m_commandList->IASetVertexBuffers(
-			0,
-			1,
-			&m_basicMesh.VertexBufferView()
-		);
+		m_srvDescriptorHeap.Get()
+	};
 
-		m_commandList->IASetIndexBuffer(
-			&m_basicMesh.IndexBufferView()
-		);
+	m_commandList->SetDescriptorHeaps(
+		_countof(descriptorHeaps),
+		descriptorHeaps
+	);
 
-		m_commandList->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
-		);
-	}
-	else
-	{
-		m_commandList->IASetVertexBuffers(
-			0,
-			1,
-			&m_tessellationMesh.VertexBufferView()
-		);
+	m_commandList->SetGraphicsRootSignature(
+		m_rootSignature.Get()
+	);
 
-		m_commandList->IASetPrimitiveTopology(
-			D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST
-		);
-	}
+	CD3DX12_GPU_DESCRIPTOR_HANDLE textureHandle(
+		m_srvDescriptorHeap
+		->GetGPUDescriptorHandleForHeapStart()
+	);
+
+	m_commandList->SetGraphicsRootDescriptorTable(
+		1,
+		textureHandle
+	);
+
+	m_commandList->RSSetViewports(
+		1,
+		&m_screenViewport
+	);
+
+	m_commandList->RSSetScissorRects(
+		1,
+		&m_scissorRect
+	);
+
+	m_commandList->OMSetRenderTargets(
+		1,
+		&GetCurrentBackBufferView(),
+		true,
+		&depthStencilViewHandle
+	);
 
 
-	// Rasterizer stage
-	m_commandList->RSSetViewports(1, &m_screenViewport);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+	// =====================================================
+	// CUBE - BASIC PIPELINE
+	// =====================================================
 
-	// Output merger stage
-	m_commandList->OMSetRenderTargets(1, &GetCurrentBackBufferView(), true, &depthStencilViewHandle);
+	m_commandList->SetPipelineState(
+		m_basicPipelineState.Get()
+	);
 
-	// Draw Geometry
-	if (m_renderingMode == RenderingMode::Basic)
-	{
-		m_commandList->DrawIndexedInstanced(
-			m_basicMesh.NumberOfIndices,
-			1,
-			0,
-			0,
-			0
-		);
-	}
-	else
-	{
-		m_commandList->DrawInstanced(
-			m_tessellationMesh.NumberOfVertices,
-			1,
-			0,
-			0
-		);
-	}
+	D3D12_GPU_VIRTUAL_ADDRESS cubeCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress();
 
-	// Indicate a state transition on the resource usage.
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GetCurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		cubeCBAddress
+	);
+
+	D3D12_VERTEX_BUFFER_VIEW cubeVBV =
+		m_basicMesh.VertexBufferView();
+
+	D3D12_INDEX_BUFFER_VIEW cubeIBV =
+		m_basicMesh.IndexBufferView();
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&cubeVBV
+	);
+
+	m_commandList->IASetIndexBuffer(
+		&cubeIBV
+	);
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+	);
+
+	m_commandList->DrawIndexedInstanced(
+		m_basicMesh.NumberOfIndices,
+		1,
+		0,
+		0,
+		0
+	);
+
+
+	// =====================================================
+	// TERRAIN - TESSELLATION PIPELINE
+	// =====================================================
+
+	m_commandList->SetPipelineState(
+		m_tessellationPipelineState.Get()
+	);
+
+	D3D12_GPU_VIRTUAL_ADDRESS terrainCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress()
+		+
+		m_objectConstantBufferByteSize;
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		terrainCBAddress
+	);
+
+	D3D12_VERTEX_BUFFER_VIEW terrainVBV =
+		m_tessellationMesh.VertexBufferView();
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&terrainVBV
+	);
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST
+	);
+
+	m_commandList->DrawInstanced(
+		m_tessellationMesh.NumberOfVertices,
+		1,
+		0,
+		0
+	);
+
+
+	// Present
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			GetCurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			D3D12_RESOURCE_STATE_PRESENT
+		)
+	);
 
 	ExecuteCommandList();
 
-	// swap the back and front buffers
-	ThrowIfFailed(m_swapChain->Present(0, 0));
-	m_currBackBuffer = (m_currBackBuffer + 1) % SwapChainBufferCount;
+	ThrowIfFailed(
+		m_swapChain->Present(0, 0)
+	);
+
+	m_currBackBuffer =
+		(m_currBackBuffer + 1) %
+		SwapChainBufferCount;
 
 	FlushCommandQueue();
 }

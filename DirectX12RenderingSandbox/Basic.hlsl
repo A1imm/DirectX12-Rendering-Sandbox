@@ -1,7 +1,10 @@
 cbuffer cbPerObject : register(b0)
 {
+    float4x4 gWorld;
     float4x4 gWorldViewProj;
+
     float3 gCameraPosition;
+    float gPadding;
 };
 
 Texture2D gTexture : register(t0);

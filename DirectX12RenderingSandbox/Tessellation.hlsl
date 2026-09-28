@@ -1,7 +1,10 @@
 cbuffer cbPerObject : register(b0)
 {
-	float4x4 gWorldViewProj;
-	float3 gCameraPosition;
+    float4x4 gWorld;
+    float4x4 gWorldViewProj;
+
+    float3 gCameraPosition;
+    float gPadding;
 };
 
 struct VertexData
@@ -29,7 +32,11 @@ struct PatchTess
 PatchTess ConstantHS(InputPatch<VertexData, 4> patch, uint patchID : SV_PrimitiveID)
 {
     PatchTess patchTess;
-    float3 objectCenter = float3(0.0f, 0.0f, 0.0f);
+    float3 objectCenter =
+    mul(
+        float4(0.0f, 0.0f, 0.0f, 1.0f),
+        gWorld
+    ).xyz;
 
     float distanceToCamera = distance(gCameraPosition, objectCenter);
 

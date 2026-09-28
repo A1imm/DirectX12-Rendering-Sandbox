@@ -5,14 +5,10 @@
 
 struct ObjectConstants
 {
+    DirectX::XMFLOAT4X4 World = Geometry::Identity4x4();
     DirectX::XMFLOAT4X4 WorldViewProj = Geometry::Identity4x4();
-    DirectX::XMFLOAT3 camera;
-};
-
-enum class RenderingMode
-{
-    Basic,
-    Tessellation
+    DirectX::XMFLOAT3 CameraPosition = { 0.0f, 0.0f, 0.0f };
+    float Padding = 0.0f;
 };
 
 class RenderWidget
@@ -24,7 +20,6 @@ public:
     void Initialize();
     void Draw();
     void Resize(int width, int height);
-    void SetRenderingMode(RenderingMode mode);
     Geometry::Camera& GetCamera() {
         return m_camera;
     }
@@ -73,7 +68,12 @@ private:
 
     //Constant buffers
     void CreateWorldViewProjectionMatrixBuffer();
-    BYTE* m_mappedData;
+    void UpdateObjectConstantBuffer(
+        UINT objectIndex,
+        const DirectX::XMMATRIX& world
+    );
+    BYTE* m_mappedData = nullptr;
+    UINT m_objectConstantBufferByteSize = 0;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_cbWVProjectionMatrix;
 
     //Shaders
@@ -96,7 +96,6 @@ private:
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_basicPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
-    RenderingMode m_renderingMode = RenderingMode::Tessellation;
 
 
     //Textures
