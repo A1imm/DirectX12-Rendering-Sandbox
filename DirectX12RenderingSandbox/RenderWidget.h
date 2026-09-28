@@ -11,6 +11,36 @@ struct ObjectConstants
     float Padding = 0.0f;
 };
 
+struct SceneConstants
+{
+    DirectX::XMFLOAT3 LightDirection =
+    {
+        0.5f,
+        -1.0f,
+        0.4f
+    };
+
+    float LightIntensity = 0.80f;
+
+    DirectX::XMFLOAT3 LightColor =
+    {
+        1.0f,
+        1.0f,
+        1.0f
+    };
+
+    float AmbientStrength = 0.20f;
+
+    float SpecularStrength = 0.25f;
+    float Shininess = 32.0f;
+
+    DirectX::XMFLOAT2 Padding =
+    {
+        0.0f,
+        0.0f
+    };
+};
+
 class RenderWidget
 {
     
@@ -66,15 +96,28 @@ private:
     const static DXGI_FORMAT DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_depthStencilBuffer;
 
-    //Constant buffers
+    // Constant buffers
     void CreateWorldViewProjectionMatrixBuffer();
+    void CreateSceneConstantBuffer();
+
     void UpdateObjectConstantBuffer(
         UINT objectIndex,
         const DirectX::XMMATRIX& world
     );
+
+    void UpdateSceneConstantBuffer();
+
     BYTE* m_mappedData = nullptr;
+    BYTE* m_sceneMappedData = nullptr;
+
     UINT m_objectConstantBufferByteSize = 0;
-    Microsoft::WRL::ComPtr<ID3D12Resource> m_cbWVProjectionMatrix;
+    UINT m_sceneConstantBufferByteSize = 0;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource>
+        m_cbWVProjectionMatrix;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource>
+        m_cbScene;
 
     //Shaders
     void CompileShaders();

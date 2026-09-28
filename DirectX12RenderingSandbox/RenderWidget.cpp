@@ -27,6 +27,7 @@ void RenderWidget::Initialize()
 
 	//2. Create shaders and resources
 	CreateWorldViewProjectionMatrixBuffer();
+	CreateSceneConstantBuffer();
 	CompileShaders();
 	LoadGeometry();
 	LoadTexture(
@@ -60,6 +61,7 @@ void RenderWidget::Initialize()
 
 	//6. Initialize the world view projection matrix
 	UpdateWorldViewProjectionBuffer();
+	UpdateSceneConstantBuffer();
 }
 
 void RenderWidget::Resize(int width, int height)
@@ -382,6 +384,40 @@ void RenderWidget::CreateWorldViewProjectionMatrixBuffer()
 	);
 }
 
+void RenderWidget::CreateSceneConstantBuffer()
+{
+	m_sceneConstantBufferByteSize =
+		DirectXHelper::CalcConstantBufferByteSize(
+			sizeof(SceneConstants)
+		);
+
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(
+				D3D12_HEAP_TYPE_UPLOAD
+			),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(
+				m_sceneConstantBufferByteSize
+			),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(
+				&m_cbScene
+			)
+		)
+	);
+
+	ThrowIfFailed(
+		m_cbScene->Map(
+			0,
+			nullptr,
+			reinterpret_cast<void**>(
+				&m_sceneMappedData
+				)
+		)
+	);
+}
 
 void RenderWidget::BuildRootSignature()
 {
@@ -392,12 +428,19 @@ void RenderWidget::BuildRootSignature()
 		0
 	);
 
-	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+	CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+
+	// b0 - per-object data
 	slotRootParameter[0].InitAsConstantBufferView(0);
+
+	// t0-t2 - textures
 	slotRootParameter[1].InitAsDescriptorTable(
 		1,
 		&resourceTable
 	);
+
+	// b1 - scene / lighting data
+	slotRootParameter[2].InitAsConstantBufferView(1);
 
 	const CD3DX12_STATIC_SAMPLER_DESC sampler(
 		0, // shaderRegister
@@ -406,7 +449,7 @@ void RenderWidget::BuildRootSignature()
 		D3D12_TEXTURE_ADDRESS_MODE_MIRROR,  // addressV
 		D3D12_TEXTURE_ADDRESS_MODE_MIRROR); // addressW
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter, 1, &sampler,
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 1, &sampler,
 		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 	Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSig = nullptr;
@@ -1060,6 +1103,17 @@ void RenderWidget::UpdateObjectConstantBuffer(
 	);
 }
 
+void RenderWidget::UpdateSceneConstantBuffer()
+{
+	SceneConstants sceneConstants;
+
+	memcpy(
+		m_sceneMappedData,
+		&sceneConstants,
+		sizeof(SceneConstants)
+	);
+}
+
 void RenderWidget::UpdateWorldViewProjectionBuffer()
 {
 	m_camera.UpdateViewMatrix();
@@ -1154,6 +1208,11 @@ void RenderWidget::Draw()
 
 	m_commandList->SetGraphicsRootSignature(
 		m_rootSignature.Get()
+	);
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		2,
+		m_cbScene->GetGPUVirtualAddress()
 	);
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE textureHandle(

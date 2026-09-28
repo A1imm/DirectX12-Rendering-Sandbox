@@ -7,6 +7,20 @@ cbuffer cbPerObject : register(b0)
     float gPadding;
 };
 
+cbuffer cbScene : register(b1)
+{
+    float3 gLightDirection;
+    float gLightIntensity;
+
+    float3 gLightColor;
+    float gAmbientStrength;
+
+    float gSpecularStrength;
+    float gShininess;
+
+    float2 gScenePadding;
+};
+
 Texture2D gTexture : register(t0);
 SamplerState gSampler : register(s0);
 
@@ -71,21 +85,11 @@ float4 PS_Main(VertexOutput input) : SV_Target
     float3 normal =
         normalize(input.WorldNormal);
 
-    // Direction in which the light rays travel.
     float3 lightDirection =
-        normalize(
-            float3(
-                0.5f,
-                -1.0f,
-                0.4f
-            )
-        );
+    normalize(gLightDirection);
 
     float3 toLight =
-        -lightDirection;
-
-    // Ambient
-    float ambientStrength = 0.20f;
+    -lightDirection;
 
     // Lambert diffuse
     float diffuseStrength =
@@ -110,25 +114,29 @@ float4 PS_Main(VertexOutput input) : SV_Target
         );
 
     float specularStrength =
-        pow(
-            saturate(
-                dot(
-                    normal,
-                    halfVector
-                )
-            ),
-            32.0f
-        );
+    pow(
+        saturate(
+            dot(
+                normal,
+                halfVector
+            )
+        ),
+        gShininess
+    );
 
     float3 lighting =
-        ambientStrength
+        gAmbientStrength
         +
-        0.80f * diffuseStrength;
+        gLightColor *
+        gLightIntensity *
+        diffuseStrength;
 
     float3 finalColor =
         albedo.rgb * lighting
         +
-        0.25f * specularStrength;
+        gLightColor *
+        gSpecularStrength *
+        specularStrength;
 
     return float4(
         finalColor,
