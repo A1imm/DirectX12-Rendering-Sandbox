@@ -450,12 +450,12 @@ void RenderWidget::CompileShaders()
     assert(m_domainShaderByteCode);
 }
 
-void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
+void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices, MeshBuffer& mesh)
 {
 	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Geometry::Vertex);
-	VertexBuffer.VertexByteStride = sizeof(Geometry::Vertex);
-	VertexBuffer.VertexBufferByteSize = vbByteSize;
-	VertexBuffer.NumberOfVertices = vertices.size();
+	mesh.VertexByteStride = sizeof(Geometry::Vertex);
+	mesh.VertexBufferByteSize = vbByteSize;
+	mesh.NumberOfVertices = vertices.size();
 
 	// Create the destination buffer
 	HRESULT result = m_dxDevice->CreateCommittedResource(&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -463,10 +463,10 @@ void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
 		&CD3DX12_RESOURCE_DESC::Buffer(vbByteSize),
 		D3D12_RESOURCE_STATE_COMMON,
 		nullptr,
-		IID_PPV_ARGS(&VertexBuffer.VertexBufferGPU));
+		IID_PPV_ARGS(&mesh.VertexBufferGPU));
 	assert(SUCCEEDED(result));
 
-	result = VertexBuffer.VertexBufferGPU->SetName(L"VertexBufferGPU");
+	result = mesh.VertexBufferGPU->SetName(L"VertexBufferGPU");
 	assert(SUCCEEDED(result));
 
 	// Create the upload buffer
@@ -475,10 +475,10 @@ void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
 		&CD3DX12_RESOURCE_DESC::Buffer(vbByteSize),
 		D3D12_RESOURCE_STATE_GENERIC_READ,
 		nullptr,
-		IID_PPV_ARGS(&VertexBuffer.VertexBufferUploader));
+		IID_PPV_ARGS(&mesh.VertexBufferUploader));
 	assert(SUCCEEDED(result));
 
-	result = VertexBuffer.VertexBufferUploader->SetName(L"VertexBufferUploader");
+	result = mesh.VertexBufferUploader->SetName(L"VertexBufferUploader");
 	assert(SUCCEEDED(result));
 
 	// Describe the data we want to copy into the default buffer.
@@ -489,26 +489,26 @@ void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices)
 	subResourceData.SlicePitch = subResourceData.RowPitch;
 	
 	// Load vertices to GPU
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(VertexBuffer.VertexBufferGPU.Get(),
+	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mesh.VertexBufferGPU.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 
-	UpdateSubresources<1>(m_commandList.Get(), VertexBuffer.VertexBufferGPU.Get(), VertexBuffer.VertexBufferUploader.Get(), 0, 0, 1, &subResourceData);
+	UpdateSubresources<1>(m_commandList.Get(), mesh.VertexBufferGPU.Get(), mesh.VertexBufferUploader.Get(), 0, 0, 1, &subResourceData);
 
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(VertexBuffer.VertexBufferGPU.Get(),
+	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mesh.VertexBufferGPU.Get(),
 		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_GENERIC_READ));
 }
 
-void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
+void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices, MeshBuffer& mesh)
 {
 	const UINT ibByteSize =
 		static_cast<UINT>(
 			indices.size() * sizeof(std::uint16_t)
 			);
 
-	IndexBuffer.IndexBufferByteSize =
+	mesh.IndexBufferByteSize =
 		ibByteSize;
 
-	IndexBuffer.NumberOfIndices =
+	mesh.NumberOfIndices =
 		static_cast<UINT>(indices.size());
 
 	// GPU buffer
@@ -524,12 +524,12 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
 			IID_PPV_ARGS(
-				&IndexBuffer.IndexBufferGPU
+				&mesh.IndexBufferGPU
 			)
 		)
 	);
 
-	IndexBuffer.IndexBufferGPU->SetName(
+	mesh.IndexBufferGPU->SetName(
 		L"IndexBufferGPU"
 	);
 
@@ -546,12 +546,12 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 			D3D12_RESOURCE_STATE_GENERIC_READ,
 			nullptr,
 			IID_PPV_ARGS(
-				&IndexBuffer.IndexBufferUploader
+				&mesh.IndexBufferUploader
 			)
 		)
 	);
 
-	IndexBuffer.IndexBufferUploader->SetName(
+	mesh.IndexBufferUploader->SetName(
 		L"IndexBufferUploader"
 	);
 
@@ -564,7 +564,7 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 	m_commandList->ResourceBarrier(
 		1,
 		&CD3DX12_RESOURCE_BARRIER::Transition(
-			IndexBuffer.IndexBufferGPU.Get(),
+			mesh.IndexBufferGPU.Get(),
 			D3D12_RESOURCE_STATE_COMMON,
 			D3D12_RESOURCE_STATE_COPY_DEST
 		)
@@ -572,8 +572,8 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 
 	UpdateSubresources<1>(
 		m_commandList.Get(),
-		IndexBuffer.IndexBufferGPU.Get(),
-		IndexBuffer.IndexBufferUploader.Get(),
+		mesh.IndexBufferGPU.Get(),
+		mesh.IndexBufferUploader.Get(),
 		0,
 		0,
 		1,
@@ -583,7 +583,7 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 	m_commandList->ResourceBarrier(
 		1,
 		&CD3DX12_RESOURCE_BARRIER::Transition(
-			IndexBuffer.IndexBufferGPU.Get(),
+			mesh.IndexBufferGPU.Get(),
 			D3D12_RESOURCE_STATE_COPY_DEST,
 			D3D12_RESOURCE_STATE_GENERIC_READ
 		)
@@ -592,11 +592,32 @@ void RenderWidget::LoadIndexBuffer(const Geometry::IndexBuffer& indices)
 
 void RenderWidget::LoadGeometry()
 {
-	const auto vertices = Geometry::CreateQuadPatchGeometry();
-	const auto indices = Geometry::CreateQuadIndices();
+	// Basic pipeline geometry - cube
+	const auto cubeVertices =
+		Geometry::CreateCubeGeometry();
 
-	LoadVertexBuffer(vertices);
-	LoadIndexBuffer(indices);
+	const auto cubeIndices =
+		Geometry::CreateCubeIndices();
+
+	LoadVertexBuffer(
+		cubeVertices,
+		m_basicMesh
+	);
+
+	LoadIndexBuffer(
+		cubeIndices,
+		m_basicMesh
+	);
+
+
+	// Tessellation pipeline geometry - quad patch
+	const auto terrainVertices =
+		Geometry::CreateQuadPatchGeometry();
+
+	LoadVertexBuffer(
+		terrainVertices,
+		m_tessellationMesh
+	);
 }
 
 void RenderWidget::LoadTexture(const wchar_t* path)
@@ -904,18 +925,30 @@ void RenderWidget::Draw()
 	m_commandList->SetGraphicsRootDescriptorTable(1, textureDescriptorHandle1);
 
 	// Input Assembly stage
-	m_commandList->IASetVertexBuffers(0, 1, &VertexBuffer.VertexBufferView());
 	if (m_renderingMode == RenderingMode::Basic)
 	{
+		m_commandList->IASetVertexBuffers(
+			0,
+			1,
+			&m_basicMesh.VertexBufferView()
+		);
+
+		m_commandList->IASetIndexBuffer(
+			&m_basicMesh.IndexBufferView()
+		);
+
 		m_commandList->IASetPrimitiveTopology(
 			D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
-		);
-		m_commandList->IASetIndexBuffer(
-			&IndexBuffer.IndexBufferView()
 		);
 	}
 	else
 	{
+		m_commandList->IASetVertexBuffers(
+			0,
+			1,
+			&m_tessellationMesh.VertexBufferView()
+		);
+
 		m_commandList->IASetPrimitiveTopology(
 			D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST
 		);
@@ -933,7 +966,7 @@ void RenderWidget::Draw()
 	if (m_renderingMode == RenderingMode::Basic)
 	{
 		m_commandList->DrawIndexedInstanced(
-			IndexBuffer.NumberOfIndices,
+			m_basicMesh.NumberOfIndices,
 			1,
 			0,
 			0,
@@ -943,7 +976,7 @@ void RenderWidget::Draw()
 	else
 	{
 		m_commandList->DrawInstanced(
-			VertexBuffer.NumberOfVertices,
+			m_tessellationMesh.NumberOfVertices,
 			1,
 			0,
 			0

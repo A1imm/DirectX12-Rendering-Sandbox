@@ -112,47 +112,67 @@ private:
 
 
     //Geometry, Camera, Vertex and Index buffer
-    void LoadGeometry();
-    void LoadVertexBuffer(const Geometry::VertexBuffer& vertices);
-    void LoadIndexBuffer(const Geometry::IndexBuffer& indices);
-    Geometry::Camera m_camera;
-
-    struct
+    struct MeshBuffer
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> VertexBufferGPU = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> VertexBufferUploader = nullptr;
+
+        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
+
         UINT VertexByteStride = 0;
         UINT VertexBufferByteSize = 0;
         size_t NumberOfVertices = 0;
-        Microsoft::WRL::ComPtr<ID3D12Resource> VertexBufferUploader = nullptr;
 
-        D3D12_VERTEX_BUFFER_VIEW VertexBufferView()const
-        {
-            D3D12_VERTEX_BUFFER_VIEW vbv;
-            vbv.BufferLocation = VertexBufferGPU->GetGPUVirtualAddress();
-            vbv.StrideInBytes = VertexByteStride;
-            vbv.SizeInBytes = VertexBufferByteSize;
-
-            return vbv;
-        }
-    }VertexBuffer;
-
-    struct
-    {
-        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferGPU = nullptr;
-        Microsoft::WRL::ComPtr<ID3D12Resource> IndexBufferUploader = nullptr;
         UINT IndexBufferByteSize = 0;
         UINT NumberOfIndices = 0;
 
+        D3D12_VERTEX_BUFFER_VIEW VertexBufferView() const
+        {
+            D3D12_VERTEX_BUFFER_VIEW view;
+
+            view.BufferLocation =
+                VertexBufferGPU->GetGPUVirtualAddress();
+
+            view.StrideInBytes =
+                VertexByteStride;
+
+            view.SizeInBytes =
+                VertexBufferByteSize;
+
+            return view;
+        }
+
         D3D12_INDEX_BUFFER_VIEW IndexBufferView() const
         {
-            D3D12_INDEX_BUFFER_VIEW ibv;
-            ibv.BufferLocation =  IndexBufferGPU->GetGPUVirtualAddress();
-            ibv.Format = DXGI_FORMAT_R16_UINT;
-            ibv.SizeInBytes = IndexBufferByteSize;
+            D3D12_INDEX_BUFFER_VIEW view;
 
-            return ibv;
+            view.BufferLocation =
+                IndexBufferGPU->GetGPUVirtualAddress();
+
+            view.Format =
+                DXGI_FORMAT_R16_UINT;
+
+            view.SizeInBytes =
+                IndexBufferByteSize;
+
+            return view;
         }
-    }IndexBuffer;
+    };
+    void LoadGeometry();
+    void LoadVertexBuffer(
+        const Geometry::VertexBuffer& vertices,
+        MeshBuffer& mesh
+    );
+
+    void LoadIndexBuffer(
+        const Geometry::IndexBuffer& indices,
+        MeshBuffer& mesh
+    );
+    Geometry::Camera m_camera;
+
+    MeshBuffer m_basicMesh;
+    MeshBuffer m_tessellationMesh;
 };
 
 #endif
