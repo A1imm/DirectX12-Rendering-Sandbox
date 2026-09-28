@@ -61,5 +61,11 @@
     <CopyFileToFolders Include="height_map.png">
       <Filter>Resources</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="WoodCrate.png">
+      <Filter>Resources</Filter>
+    </CopyFileToFolders>
+    <CopyFileToFolders Include="grass-02.png">
+        <Filter>Resources</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>

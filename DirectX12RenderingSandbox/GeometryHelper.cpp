@@ -99,7 +99,7 @@ std::tuple<std::unique_ptr<BYTE[]>, UINT, UINT> DirectXHelper::LoadTextureToBuff
 		return { nullptr, 0, 0 };
 	}
 
-	constexpr unsigned int BytesPerPixel = 32; //GUID_WICPixelFormat32bppRGBA is 32bpp!
+	constexpr unsigned int BytesPerPixel = 4; //32 bits = 4 bytes per pixel
 	const unsigned int rowBytes = width * BytesPerPixel;
 	const unsigned int byteSize = height * rowBytes;
 

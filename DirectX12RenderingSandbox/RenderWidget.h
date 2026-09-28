@@ -98,10 +98,22 @@ private:
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
 
 
-    //Textures
-    void LoadTexture(const wchar_t* file);
-    Microsoft::WRL::ComPtr<ID3D12Resource> m_textureResource = nullptr;
-    Microsoft::WRL::ComPtr<ID3D12Resource> m_textureResourceUpload = nullptr;
+    // Textures
+    struct TextureResource
+    {
+        Microsoft::WRL::ComPtr<ID3D12Resource> Resource = nullptr;
+        Microsoft::WRL::ComPtr<ID3D12Resource> UploadResource = nullptr;
+    };
+
+    void LoadTexture(
+        const wchar_t* file,
+        TextureResource& texture,
+        UINT descriptorIndex
+    );
+
+    TextureResource m_cubeTexture;
+    TextureResource m_terrainHeightMap;
+    TextureResource m_terrainTexture;
 
 
     //Viewport

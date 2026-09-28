@@ -80,8 +80,10 @@ struct DomainOut
 };
 
 /*----------------DOMAIN SHADER------------------------------------------*/
-Texture2D    gTexture1 : register(t0);
-SamplerState gSampler1  : register(s0);
+Texture2D gHeightMap : register(t1);
+Texture2D gTerrainTexture : register(t2);
+
+SamplerState gSampler : register(s0);
 
 [domain("quad")]
 DomainOut DS_Main(PatchTess patchTess, float2 uv : SV_DomainLocation, const OutputPatch<HullOut, 4> quad)
@@ -96,7 +98,7 @@ DomainOut DS_Main(PatchTess patchTess, float2 uv : SV_DomainLocation, const Outp
     float2 uv_v2 = lerp(quad[3].uv, quad[2].uv, uv.x);
     dout.uv = lerp(uv_v1, uv_v2, uv.y);
 
-    float height = gTexture1.SampleLevel(gSampler1, dout.uv, 0).r;
+    float height = gHeightMap.SampleLevel(gSampler, dout.uv, 0).r;
 
     p.y += height * 0.3f;
 
@@ -108,5 +110,5 @@ DomainOut DS_Main(PatchTess patchTess, float2 uv : SV_DomainLocation, const Outp
 /*----------------PIXEL SHADER------------------------------------------*/
 float4 PS_Main(DomainOut pin) : SV_Target
 {
-    return gTexture1.Sample(gSampler1, pin.uv);
+    return gTerrainTexture.Sample(gSampler, pin.uv);
 }

@@ -29,7 +29,23 @@ void RenderWidget::Initialize()
 	CreateWorldViewProjectionMatrixBuffer();
 	CompileShaders();
 	LoadGeometry();
-	LoadTexture(L"height_map.png");
+	LoadTexture(
+		L"WoodCrate.png",
+		m_cubeTexture,
+		0
+	);
+
+	LoadTexture(
+		L"height_map.png",
+		m_terrainHeightMap,
+		1
+	);
+
+	LoadTexture(
+		L"grass-02.png",
+		m_terrainTexture,
+		2
+	);
 
 	//3. Initialize Graphic Pipeline
 	BuildRootSignature();
@@ -165,7 +181,7 @@ void RenderWidget::CreateDescriptorHeaps()
 
 	// Shader Resource View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 2;
+	srvHeapDesc.NumDescriptors = 3;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	result = m_dxDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvDescriptorHeap));
@@ -369,13 +385,19 @@ void RenderWidget::CreateWorldViewProjectionMatrixBuffer()
 
 void RenderWidget::BuildRootSignature()
 {
-	CD3DX12_DESCRIPTOR_RANGE resourceTable[2];
-	resourceTable[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-	resourceTable[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+	CD3DX12_DESCRIPTOR_RANGE resourceTable;
+	resourceTable.Init(
+		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
+		3,
+		0
+	);
 
 	CD3DX12_ROOT_PARAMETER slotRootParameter[2];
 	slotRootParameter[0].InitAsConstantBufferView(0);
-	slotRootParameter[1].InitAsDescriptorTable(2, resourceTable);
+	slotRootParameter[1].InitAsDescriptorTable(
+		1,
+		&resourceTable
+	);
 
 	const CD3DX12_STATIC_SAMPLER_DESC sampler(
 		0, // shaderRegister
@@ -641,84 +663,159 @@ void RenderWidget::LoadGeometry()
 	);
 }
 
-void RenderWidget::LoadTexture(const wchar_t* path)
+void RenderWidget::LoadTexture(
+	const wchar_t* path,
+	TextureResource& texture,
+	UINT descriptorIndex)
 {
-	auto&&[buffer, width, height] = DirectXHelper::LoadTextureToBuffer(path);
+	auto&& [buffer, width, height] =
+		DirectXHelper::LoadTextureToBuffer(path);
+
 	if (buffer == nullptr)
 	{
-		assert(false && "Something is wrong with the file");
+		assert(false && "Something is wrong with the texture file");
 		return;
 	}
 
-	// Create texture
-	D3D12_RESOURCE_DESC texturedesc = {};
-	texturedesc.Width = width;
-	texturedesc.Height = height;
-	texturedesc.MipLevels = static_cast<UINT16>(1);
-	texturedesc.DepthOrArraySize = 1;
-	texturedesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
-	texturedesc.SampleDesc.Count = 1;
-	texturedesc.SampleDesc.Quality = 0;
-	texturedesc.Flags = D3D12_RESOURCE_FLAG_NONE;
-	texturedesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	texturedesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+	// Texture resource
+	D3D12_RESOURCE_DESC textureDesc = {};
 
-	const CD3DX12_HEAP_PROPERTIES defaultHeapProperties(D3D12_HEAP_TYPE_DEFAULT);
-	
-	HRESULT result = m_dxDevice->CreateCommittedResource(
-		&defaultHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&texturedesc,
-		D3D12_RESOURCE_STATE_COMMON,
-		nullptr,
-		IID_PPV_ARGS(&m_textureResource));
-	assert(SUCCEEDED(result));
-	m_textureResource->SetName(L"Texture");
+	textureDesc.Width = width;
+	textureDesc.Height = height;
+	textureDesc.MipLevels = 1;
+	textureDesc.DepthOrArraySize = 1;
+	textureDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	textureDesc.SampleDesc.Count = 1;
+	textureDesc.SampleDesc.Quality = 0;
+	textureDesc.Flags = D3D12_RESOURCE_FLAG_NONE;
+	textureDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+	textureDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 
-	//Create Upload resource
-	const auto uploadBufferSize = GetRequiredIntermediateSize(m_textureResource.Get(), 0, 1);
-	const CD3DX12_HEAP_PROPERTIES uploadHeapProperties(D3D12_HEAP_TYPE_UPLOAD);
-	result = m_dxDevice->CreateCommittedResource(
-		&uploadHeapProperties,
-		D3D12_HEAP_FLAG_NONE,
-		&CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize),
-		D3D12_RESOURCE_STATE_GENERIC_READ,
-		nullptr,
-		IID_PPV_ARGS(&m_textureResourceUpload));
-	assert(SUCCEEDED(result));
-	m_textureResourceUpload->SetName(L"Upload texture buffer");
+	const CD3DX12_HEAP_PROPERTIES defaultHeapProperties(
+		D3D12_HEAP_TYPE_DEFAULT
+	);
 
-	//Calculate image byte size
-	constexpr unsigned int bytesPerPixel = 32;//Image format is DXGI_FORMAT_R8G8B8A8_UNORM so each row is 32 bytes
-	const unsigned int rowBytesSize = width * bytesPerPixel;
-	const unsigned int byteSize = height * rowBytesSize;
-	// Describe the data we want to copy into the default buffer.
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&defaultHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&textureDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&texture.Resource)
+		)
+	);
+
+	// Upload resource
+	const UINT64 uploadBufferSize =
+		GetRequiredIntermediateSize(
+			texture.Resource.Get(),
+			0,
+			1
+		);
+
+	const CD3DX12_HEAP_PROPERTIES uploadHeapProperties(
+		D3D12_HEAP_TYPE_UPLOAD
+	);
+
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(
+				uploadBufferSize
+			),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&texture.UploadResource)
+		)
+	);
+
+	constexpr UINT bytesPerPixel = 4;
+
+	const UINT rowBytesSize =
+		width * bytesPerPixel;
+
+	const UINT byteSize =
+		height * rowBytesSize;
+
 	D3D12_SUBRESOURCE_DATA subResourceData = {};
-	subResourceData.pData = buffer.get();
-	subResourceData.RowPitch = rowBytesSize;
-	subResourceData.SlicePitch = byteSize;
 
+	subResourceData.pData =
+		buffer.get();
 
-	//Load the image to the newly created resource
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_textureResource.Get(),
-		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-	auto d = UpdateSubresources<1>(m_commandList.Get(), m_textureResource.Get(), m_textureResourceUpload.Get(), 0, 0, 1, &subResourceData);
-	m_commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_textureResource.Get(),
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE));
+	subResourceData.RowPitch =
+		rowBytesSize;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(m_srvDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+	subResourceData.SlicePitch =
+		byteSize;
 
-	// 3. Shader resouce view
-	//Texture is a resouce so it requires a view
+	// Upload texture
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			texture.Resource.Get(),
+			D3D12_RESOURCE_STATE_COMMON,
+			D3D12_RESOURCE_STATE_COPY_DEST
+		)
+	);
+
+	UpdateSubresources<1>(
+		m_commandList.Get(),
+		texture.Resource.Get(),
+		texture.UploadResource.Get(),
+		0,
+		0,
+		1,
+		&subResourceData
+	);
+
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			texture.Resource.Get(),
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE
+		)
+	);
+
+	// Create SRV in selected heap slot
+	const UINT descriptorSize =
+		m_dxDevice->GetDescriptorHandleIncrementSize(
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+		);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE descriptorHandle(
+		m_srvDescriptorHeap
+		->GetCPUDescriptorHandleForHeapStart(),
+		descriptorIndex,
+		descriptorSize
+	);
+
 	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = m_textureResource->GetDesc().Format;  //srvDesc.Format = m_textureResource->GetDesc().Format;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MostDetailedMip = 0;
-	srvDesc.Texture2D.MipLevels = m_textureResource->GetDesc().MipLevels; //srvDesc.Texture2D.MipLevels = m_textureResource->GetDesc().MipLevels;
-	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 
-	m_dxDevice->CreateShaderResourceView(m_textureResource.Get(), &srvDesc, hDescriptor);
+	srvDesc.Shader4ComponentMapping =
+		D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	srvDesc.Format =
+		texture.Resource->GetDesc().Format;
+
+	srvDesc.ViewDimension =
+		D3D12_SRV_DIMENSION_TEXTURE2D;
+
+	srvDesc.Texture2D.MostDetailedMip = 0;
+
+	srvDesc.Texture2D.MipLevels =
+		texture.Resource->GetDesc().MipLevels;
+
+	srvDesc.Texture2D.ResourceMinLODClamp =
+		0.0f;
+
+	m_dxDevice->CreateShaderResourceView(
+		texture.Resource.Get(),
+		&srvDesc,
+		descriptorHandle
+	);
 }
 
 void RenderWidget::CreateGraphicPipelines()
