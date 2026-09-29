@@ -1,3 +1,5 @@
+#include "ShaderConstants.hlsli"
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -55,7 +57,15 @@ PatchTess ConstantHS(InputPatch<VertexData, 4> patch, uint patchID : SV_Primitiv
 
     float distanceToCamera = distance(gCameraPosition, objectCenter);
 
-    float tessFactor = lerp(64.0f, 4.0f, saturate(distanceToCamera / 10.0f));
+    float tessFactor =
+    lerp(
+        TERRAIN_MAX_TESS_FACTOR,
+        kTerrainMinTessFactor,
+        saturate(
+            distanceToCamera /
+            kTerrainTessellationDistance
+        )
+    );
 
     patchTess.EdgeTess[0] = tessFactor;
     patchTess.EdgeTess[1] = tessFactor;
@@ -79,7 +89,7 @@ struct HullOut
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("ConstantHS")]
-[maxtessfactor(64.0f)]
+[maxtessfactor(TERRAIN_MAX_TESS_FACTOR)]
 HullOut HS_Main(InputPatch<VertexData, 4> p, uint i : SV_OutputControlPointID, uint patchId : SV_PrimitiveID)
 {
     HullOut hout;
@@ -163,8 +173,6 @@ DomainOut DS_Main(
     // HEIGHT DISPLACEMENT
     // =====================================================
 
-    const float heightScale = 0.3f;
-
     float height =
         gHeightMap.SampleLevel(
             gSampler,
@@ -172,7 +180,9 @@ DomainOut DS_Main(
             0
         ).r;
 
-    p.y += height * heightScale;
+    p.y +=
+    height *
+    kTerrainHeightScale;
 
 
     // =====================================================
@@ -227,7 +237,7 @@ DomainOut DS_Main(
         float3(
             0.0f,
             (heightUPositive - heightUNegative)
-                * heightScale,
+                * kTerrainHeightScale,
             4.0f * texelSize.x
         );
 
@@ -236,7 +246,7 @@ DomainOut DS_Main(
         float3(
             4.0f * texelSize.y,
             (heightVNegative - heightVPositive)
-                * heightScale,
+                * kTerrainHeightScale,
             0.0f
         );
 
@@ -330,8 +340,6 @@ float CalculateShadowFactor(
             shadowHeight
         );
 
-    const float shadowBias = 0.001f;
-
     float shadowFactor = 0.0f;
 
     [unroll]
@@ -348,7 +356,7 @@ float CalculateShadowFactor(
                 gShadowMap.SampleCmpLevelZero(
                     gShadowSampler,
                     shadowUV + offset,
-                    projected.z - shadowBias
+                    projected.z - kShadowReceiverBias
                 );
         }
     }

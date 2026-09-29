@@ -1,3 +1,5 @@
+#include "ShaderConstants.hlsli"
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -136,8 +138,6 @@ float CalculateShadowFactor(
             shadowHeight
         );
 
-    const float shadowBias = 0.001f;
-
     float shadowFactor = 0.0f;
 
     [unroll]
@@ -154,7 +154,7 @@ float CalculateShadowFactor(
                 gShadowMap.SampleCmpLevelZero(
                     gShadowSampler,
                     shadowUV + offset,
-                    projected.z - shadowBias
+                    projected.z - kShadowReceiverBias
                 );
         }
     }

@@ -1,3 +1,5 @@
+#include "ShaderConstants.hlsli"
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -97,10 +99,11 @@ PatchTess ConstantHS_Shadow(
 
     float tessFactor =
         lerp(
-            64.0f,
-            4.0f,
+            TERRAIN_MAX_TESS_FACTOR,
+            kTerrainMinTessFactor,
             saturate(
-                distanceToCamera / 10.0f
+                distanceToCamera /
+                kTerrainTessellationDistance
             )
         );
 
@@ -128,7 +131,7 @@ struct TerrainHullOut
 [outputtopology("triangle_cw")]
 [outputcontrolpoints(4)]
 [patchconstantfunc("ConstantHS_Shadow")]
-[maxtessfactor(64.0f)]
+[maxtessfactor(TERRAIN_MAX_TESS_FACTOR)]
 TerrainHullOut HS_TerrainShadow(
     InputPatch<TerrainVertexData, 4> patch,
     uint index : SV_OutputControlPointID,
@@ -203,9 +206,6 @@ TerrainShadowOutput DS_TerrainShadow(
             uv.y
         );
 
-
-    const float heightScale = 0.3f;
-
     float height =
         gHeightMap.SampleLevel(
             gSampler,
@@ -214,7 +214,7 @@ TerrainShadowOutput DS_TerrainShadow(
         ).r;
 
     position.y +=
-        height * heightScale;
+        height * kTerrainHeightScale;
 
 
     output.Position =

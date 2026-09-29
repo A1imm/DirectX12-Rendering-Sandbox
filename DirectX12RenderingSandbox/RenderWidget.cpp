@@ -34,31 +34,31 @@ void RenderWidget::Initialize()
 	LoadTexture(
 		L"WoodCrate.png",
 		m_cubeTexture,
-		0
+		static_cast<UINT>(TextureSlot::CubeAlbedo)
 	);
 
 	LoadTexture(
 		L"height_map.png",
 		m_terrainHeightMap,
-		1
+		static_cast<UINT>(TextureSlot::TerrainHeight)
 	);
 
 	LoadTexture(
 		L"grass-02.png",
 		m_terrainTexture,
-		2
+		static_cast<UINT>(TextureSlot::TerrainAlbedo)
 	);
 
 	LoadTexture(
 		L"WoodCrateNormal.png",
 		m_cubeNormalMap,
-		3
+		static_cast<UINT>(TextureSlot::CubeNormal)
 	);
 
 	LoadTexture(
 		L"BushBillboard.png",
 		m_billboardTexture,
-		5
+		static_cast<UINT>(TextureSlot::Billboard)
 	);
 
 	//3. Initialize Graphic Pipeline
@@ -200,7 +200,7 @@ void RenderWidget::CreateDescriptorHeaps()
 
 	// Shader Resource View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 6;
+	srvHeapDesc.NumDescriptors = static_cast<UINT>(TextureSlot::Count);
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	result = m_dxDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvDescriptorHeap));
@@ -451,7 +451,7 @@ void RenderWidget::CreateShadowMap()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE shadowSrvHandle(
 		m_srvDescriptorHeap
 		->GetCPUDescriptorHandleForHeapStart(),
-		4,
+		static_cast<UINT>(TextureSlot::ShadowMap),
 		m_srvDescriptorSize
 	);
 
@@ -522,7 +522,7 @@ void RenderWidget::CreateWorldViewProjectionMatrixBuffer()
 			sizeof(ObjectConstants)
 		);
 
-	constexpr UINT objectCount = 3;
+	constexpr UINT objectCount = static_cast<UINT>(ObjectSlot::Count);
 
 	ThrowIfFailed(
 		m_dxDevice->CreateCommittedResource(
@@ -593,7 +593,7 @@ void RenderWidget::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE resourceTable;
 	resourceTable.Init(
 		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		6,
+		static_cast<UINT>(TextureSlot::Count),
 		0
 	);
 
@@ -1445,15 +1445,15 @@ void RenderWidget::CreateGraphicPipelines()
 
 	// Bias helps prevent shadow acne.
 	shadowBasicPsoDesc.RasterizerState.DepthBias =
-		1000;
+		ShadowDepthBias;
 
 	shadowBasicPsoDesc.RasterizerState
 		.SlopeScaledDepthBias =
-		1.0f;
+		ShadowSlopeScaledDepthBias;
 
 	shadowBasicPsoDesc.RasterizerState
 		.DepthBiasClamp =
-		0.0f;
+		ShadowDepthBiasClamp;
 
 
 	shadowBasicPsoDesc.BlendState =
@@ -1575,15 +1575,15 @@ void RenderWidget::CreateGraphicPipelines()
 		D3D12_CULL_MODE_NONE;
 
 	shadowTerrainPsoDesc.RasterizerState.DepthBias =
-		1000;
+		ShadowDepthBias;
 
 	shadowTerrainPsoDesc.RasterizerState
 		.SlopeScaledDepthBias =
-		1.0f;
+		ShadowSlopeScaledDepthBias;
 
 	shadowTerrainPsoDesc.RasterizerState
 		.DepthBiasClamp =
-		0.0f;
+		ShadowDepthBiasClamp;
 
 
 	shadowTerrainPsoDesc.BlendState =
@@ -1892,12 +1892,12 @@ void RenderWidget::UpdateWorldViewProjectionBuffer()
 		);
 
 	UpdateObjectConstantBuffer(
-		0,
+		static_cast<UINT>(ObjectSlot::Cube),
 		cubeWorld
 	);
 
 	UpdateObjectConstantBuffer(
-		1,
+		static_cast<UINT>(ObjectSlot::Terrain),
 		terrainWorld
 	);
 
@@ -1907,7 +1907,7 @@ void RenderWidget::UpdateWorldViewProjectionBuffer()
 		DirectX::XMMatrixIdentity();
 
 	UpdateObjectConstantBuffer(
-		2,
+		static_cast<UINT>(ObjectSlot::Billboard),
 		billboardWorld
 	);
 }
@@ -2283,7 +2283,7 @@ void RenderWidget::Draw()
 		m_cbWVProjectionMatrix
 		->GetGPUVirtualAddress()
 		+
-		m_objectConstantBufferByteSize;
+		static_cast<UINT>(ObjectSlot::Terrain) * m_objectConstantBufferByteSize;
 
 	m_commandList->SetGraphicsRootConstantBufferView(
 		0,
@@ -2322,7 +2322,7 @@ void RenderWidget::Draw()
 		m_cbWVProjectionMatrix
 		->GetGPUVirtualAddress()
 		+
-		2 * m_objectConstantBufferByteSize;
+		static_cast<UINT>(ObjectSlot::Billboard) * m_objectConstantBufferByteSize;
 
 	m_commandList->SetGraphicsRootConstantBufferView(
 		0,

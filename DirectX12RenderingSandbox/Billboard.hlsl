@@ -1,3 +1,5 @@
+#include "ShaderConstants.hlsli"
+
 cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
@@ -76,25 +78,22 @@ void GS_Main(
             )
         );
 
-    const float halfWidth = 0.30f;
-    const float height = 0.90f;
-
     // center represents the bottom-center of the billboard.
     float3 bottomLeft =
         center -
-        right * halfWidth;
+        right * kBillboardHalfWidth;
 
     float3 bottomRight =
         center +
-        right * halfWidth;
+        right * kBillboardHalfWidth;
 
     float3 topLeft =
         bottomLeft +
-        worldUp * height;
+        worldUp * kBillboardHeight;
 
     float3 topRight =
         bottomRight +
-        worldUp * height;
+        worldUp * kBillboardHeight;
 
 
     GeometryOutput output;
@@ -164,7 +163,10 @@ float4 PS_Main(
             input.UV
         );
 
-    clip(color.a - 0.30f);
+    clip(
+        color.a -
+        kBillboardAlphaCutoff
+    );
 
     return color;
 }

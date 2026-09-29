@@ -57,6 +57,24 @@ public:
     }
     
 private:
+    enum class ObjectSlot : UINT
+    {
+        Cube = 0,
+        Terrain,
+        Billboard,
+        Count
+    };
+
+    enum class TextureSlot : UINT
+    {
+        CubeAlbedo = 0,
+        TerrainHeight,
+        TerrainAlbedo,
+        CubeNormal,
+        ShadowMap,
+        Billboard,
+        Count
+    };
     UINT m_rtvDescriptorSize = 0;
     UINT m_dsvDescriptorSize = 0;
     UINT m_srvDescriptorSize = 0;
@@ -64,8 +82,8 @@ private:
     void CreateDXDeviceAndFactory();
     void CreateSwapChain(unsigned int width, unsigned int height);
     void ResizeSwapChain(unsigned int width, unsigned int height);
-    ID3D12Resource* RenderWidget::GetCurrentBackBuffer()const;
-    D3D12_CPU_DESCRIPTOR_HANDLE RenderWidget::GetCurrentBackBufferView()const;
+    ID3D12Resource* GetCurrentBackBuffer() const;
+    D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const;
     const static DXGI_FORMAT BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
     static const int SwapChainBufferCount = 2;
     Microsoft::WRL::ComPtr<IDXGISwapChain> m_swapChain;
@@ -108,6 +126,12 @@ private:
         GetLightViewProjectionMatrix() const;
 
     static constexpr UINT ShadowMapSize = 2048;
+
+    static constexpr INT ShadowDepthBias = 1000;
+
+    static constexpr float ShadowSlopeScaledDepthBias = 1.0f;
+
+    static constexpr float ShadowDepthBiasClamp = 0.0f;
 
     static const DXGI_FORMAT ShadowMapResourceFormat =
         DXGI_FORMAT_R24G8_TYPELESS;

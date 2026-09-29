@@ -45,7 +45,7 @@ namespace Geometry
 		vertices.emplace_back(DirectX::XMFLOAT3(1.0f, 0.0f, 1.0f), DirectX::XMFLOAT2(1.0, 0.0));
 		vertices.emplace_back(DirectX::XMFLOAT3(1.0f, 0.0f, -1.0f), DirectX::XMFLOAT2(0.0, 0.0));	
 
-		return std::move(vertices);
+		return vertices;
 	}
 
 	inline IndexBuffer CreateQuadIndices()
