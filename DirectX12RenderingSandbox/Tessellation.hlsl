@@ -2,7 +2,8 @@ cbuffer cbPerObject : register(b0)
 {
     float4x4 gWorld;
     float4x4 gWorldViewProj;
-
+    float4x4 gWorldLightViewProj;
+    
     float3 gCameraPosition;
     float gPadding;
 };
@@ -93,13 +94,16 @@ struct DomainOut
     float3 WorldPosition : POSITION0;
     float3 WorldNormal : NORMAL;
 	float2 uv : TEXCOORD0;
+    float4 ShadowPosition : TEXCOORD1;
 };
 
 /*----------------DOMAIN SHADER------------------------------------------*/
 Texture2D gHeightMap : register(t1);
 Texture2D gTerrainTexture : register(t2);
+Texture2D<float> gShadowMap : register(t4);
 
 SamplerState gSampler : register(s0);
+SamplerComparisonState gShadowSampler : register(s1);
 
 [domain("quad")]
 DomainOut DS_Main(
@@ -272,8 +276,84 @@ DomainOut DS_Main(
             float4(p, 1.0f),
             gWorldViewProj
         );
+    
+    dout.ShadowPosition =
+    mul(
+        float4(p, 1.0f),
+        gWorldLightViewProj
+    );
 
     return dout;
+}
+
+float CalculateShadowFactor(
+    float4 shadowPosition)
+{
+    float3 projected =
+        shadowPosition.xyz /
+        shadowPosition.w;
+
+    float2 shadowUV;
+
+    shadowUV.x =
+        projected.x * 0.5f + 0.5f;
+
+    shadowUV.y =
+        -projected.y * 0.5f + 0.5f;
+
+    if (projected.z <= 0.0f ||
+        projected.z >= 1.0f)
+    {
+        return 1.0f;
+    }
+
+    if (shadowUV.x < 0.0f ||
+        shadowUV.x > 1.0f ||
+        shadowUV.y < 0.0f ||
+        shadowUV.y > 1.0f)
+    {
+        return 1.0f;
+    }
+
+    uint shadowWidth;
+    uint shadowHeight;
+
+    gShadowMap.GetDimensions(
+        shadowWidth,
+        shadowHeight
+    );
+
+    float2 texelSize =
+        1.0f /
+        float2(
+            shadowWidth,
+            shadowHeight
+        );
+
+    const float shadowBias = 0.001f;
+
+    float shadowFactor = 0.0f;
+
+    [unroll]
+    for (int y = -1; y <= 1; ++y)
+    {
+        [unroll]
+        for (int x = -1; x <= 1; ++x)
+        {
+            float2 offset =
+                float2(x, y) *
+                texelSize;
+
+            shadowFactor +=
+                gShadowMap.SampleCmpLevelZero(
+                    gShadowSampler,
+                    shadowUV + offset,
+                    projected.z - shadowBias
+                );
+        }
+    }
+
+    return shadowFactor / 9.0f;
 }
 
 /*----------------PIXEL SHADER------------------------------------------*/
@@ -312,16 +392,28 @@ float4 PS_Main(DomainOut input, bool isFrontFace : SV_IsFrontFace) : SV_Target
             )
         );
 
+    float shadowFactor =
+    CalculateShadowFactor(
+        input.ShadowPosition
+    );
+
+
+    float3 directLighting =
+    gLightColor *
+    gLightIntensity *
+    diffuseStrength;
+
+
     float3 lighting =
-        gAmbientStrength
-        +
-        gLightColor
-        * gLightIntensity
-        * diffuseStrength;
+    gAmbientStrength
+    +
+    shadowFactor *
+    directLighting;
+
 
     float3 finalColor =
-        albedo.rgb
-        * lighting;
+    albedo.rgb *
+    lighting;
 
     return float4(
         finalColor,

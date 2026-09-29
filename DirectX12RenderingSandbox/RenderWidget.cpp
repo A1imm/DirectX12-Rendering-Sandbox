@@ -24,6 +24,7 @@ void RenderWidget::Initialize()
 	CreateCommandObjects();
 	CreateSwapChain(m_width, m_height);
 	CreateDescriptorHeaps();
+	CreateShadowMap();
 
 	//2. Create shaders and resources
 	CreateWorldViewProjectionMatrixBuffer();
@@ -178,7 +179,7 @@ void RenderWidget::CreateDescriptorHeaps()
 
 	// Depth Stencil View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC dsvHeapDesc;
-	dsvHeapDesc.NumDescriptors = 1;
+	dsvHeapDesc.NumDescriptors = 2;
 	dsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	dsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	dsvHeapDesc.NodeMask = 0;
@@ -186,15 +187,23 @@ void RenderWidget::CreateDescriptorHeaps()
 		&dsvHeapDesc, IID_PPV_ARGS(m_dsvDescriptorHeap.GetAddressOf()));
 	assert(SUCCEEDED(result) && "Can't create the depth stencil view heap descriptor");
 	ThrowIfFailed(result);
+	m_dsvDescriptorSize =
+		m_dxDevice->GetDescriptorHandleIncrementSize(
+			D3D12_DESCRIPTOR_HEAP_TYPE_DSV
+		);
 
 	// Shader Resource View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 4;
+	srvHeapDesc.NumDescriptors = 5;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	result = m_dxDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvDescriptorHeap));
 	assert(SUCCEEDED(result) && "Can't create the shader resource view heap descriptor");
 	ThrowIfFailed(result);
+	m_srvDescriptorSize =
+		m_dxDevice->GetDescriptorHandleIncrementSize(
+			D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV
+		);
 }
 
 void RenderWidget::CreateSwapChain(unsigned int width, unsigned int height)
@@ -340,6 +349,154 @@ void RenderWidget::CreateDepthStencilView(unsigned int width, unsigned int heigh
 	m_depthStencilBuffer->SetName(L"Depth Stencil View");
 }
 
+void RenderWidget::CreateShadowMap()
+{
+	D3D12_RESOURCE_DESC shadowDesc = {};
+
+	shadowDesc.Dimension =
+		D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+
+	shadowDesc.Alignment = 0;
+
+	shadowDesc.Width =
+		ShadowMapSize;
+
+	shadowDesc.Height =
+		ShadowMapSize;
+
+	shadowDesc.DepthOrArraySize = 1;
+	shadowDesc.MipLevels = 1;
+
+	shadowDesc.Format =
+		ShadowMapResourceFormat;
+
+	shadowDesc.SampleDesc.Count = 1;
+	shadowDesc.SampleDesc.Quality = 0;
+
+	shadowDesc.Layout =
+		D3D12_TEXTURE_LAYOUT_UNKNOWN;
+
+	shadowDesc.Flags =
+		D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
+
+
+	D3D12_CLEAR_VALUE clearValue = {};
+
+	clearValue.Format =
+		ShadowMapDSVFormat;
+
+	clearValue.DepthStencil.Depth = 1.0f;
+	clearValue.DepthStencil.Stencil = 0;
+
+
+	ThrowIfFailed(
+		m_dxDevice->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(
+				D3D12_HEAP_TYPE_DEFAULT
+			),
+			D3D12_HEAP_FLAG_NONE,
+			&shadowDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			&clearValue,
+			IID_PPV_ARGS(&m_shadowMap)
+		)
+	);
+
+	m_shadowMap->SetName(
+		L"Shadow Map"
+	);
+
+
+	// =========================================
+	// DSV - descriptor slot 1
+	// =========================================
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsvHandle(
+		m_dsvDescriptorHeap
+		->GetCPUDescriptorHandleForHeapStart(),
+		1,
+		m_dsvDescriptorSize
+	);
+
+	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc = {};
+
+	dsvDesc.Flags =
+		D3D12_DSV_FLAG_NONE;
+
+	dsvDesc.ViewDimension =
+		D3D12_DSV_DIMENSION_TEXTURE2D;
+
+	dsvDesc.Format =
+		ShadowMapDSVFormat;
+
+	dsvDesc.Texture2D.MipSlice = 0;
+
+	m_dxDevice->CreateDepthStencilView(
+		m_shadowMap.Get(),
+		&dsvDesc,
+		shadowDsvHandle
+	);
+
+
+	// =========================================
+	// SRV - descriptor slot 4 / register t4
+	// =========================================
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE shadowSrvHandle(
+		m_srvDescriptorHeap
+		->GetCPUDescriptorHandleForHeapStart(),
+		4,
+		m_srvDescriptorSize
+	);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+
+	srvDesc.Shader4ComponentMapping =
+		D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+	srvDesc.Format =
+		ShadowMapSRVFormat;
+
+	srvDesc.ViewDimension =
+		D3D12_SRV_DIMENSION_TEXTURE2D;
+
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+	m_dxDevice->CreateShaderResourceView(
+		m_shadowMap.Get(),
+		&srvDesc,
+		shadowSrvHandle
+	);
+
+
+	// =========================================
+	// Shadow viewport
+	// =========================================
+
+	m_shadowViewport.TopLeftX = 0.0f;
+	m_shadowViewport.TopLeftY = 0.0f;
+
+	m_shadowViewport.Width =
+		static_cast<float>(ShadowMapSize);
+
+	m_shadowViewport.Height =
+		static_cast<float>(ShadowMapSize);
+
+	m_shadowViewport.MinDepth = 0.0f;
+	m_shadowViewport.MaxDepth = 1.0f;
+
+
+	m_shadowScissorRect =
+	{
+		0,
+		0,
+		static_cast<LONG>(ShadowMapSize),
+		static_cast<LONG>(ShadowMapSize)
+	};
+}
+
 void RenderWidget::UpdateViewport(unsigned int width, unsigned int height)
 {
 	m_screenViewport.TopLeftX = 0;
@@ -430,7 +587,7 @@ void RenderWidget::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE resourceTable;
 	resourceTable.Init(
 		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		4,
+		5,
 		0
 	);
 
@@ -448,15 +605,39 @@ void RenderWidget::BuildRootSignature()
 	// b1 - scene / lighting data
 	slotRootParameter[2].InitAsConstantBufferView(1);
 
-	const CD3DX12_STATIC_SAMPLER_DESC sampler(
-		0, // shaderRegister
-		D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR,   // filter
-		D3D12_TEXTURE_ADDRESS_MODE_MIRROR,  // addressU
-		D3D12_TEXTURE_ADDRESS_MODE_MIRROR,  // addressV
-		D3D12_TEXTURE_ADDRESS_MODE_MIRROR); // addressW
+	CD3DX12_STATIC_SAMPLER_DESC samplers[2];
 
-	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter, 1, &sampler,
-		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+	// Normal texture sampler - s0
+	samplers[0] =
+		CD3DX12_STATIC_SAMPLER_DESC(
+			0,
+			D3D12_FILTER_MIN_MAG_POINT_MIP_LINEAR,
+			D3D12_TEXTURE_ADDRESS_MODE_MIRROR,
+			D3D12_TEXTURE_ADDRESS_MODE_MIRROR,
+			D3D12_TEXTURE_ADDRESS_MODE_MIRROR
+		);
+
+	// Shadow comparison sampler - s1
+	samplers[1] =
+		CD3DX12_STATIC_SAMPLER_DESC(
+			1,
+			D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT,
+			D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			D3D12_TEXTURE_ADDRESS_MODE_BORDER,
+			0.0f,
+			16,
+			D3D12_COMPARISON_FUNC_LESS_EQUAL,
+			D3D12_STATIC_BORDER_COLOR_OPAQUE_WHITE
+		);
+
+	CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(
+		3,
+		slotRootParameter,
+		2,
+		samplers,
+		D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT
+	);
 
 	Microsoft::WRL::ComPtr<ID3DBlob> serializedRootSig = nullptr;
 	Microsoft::WRL::ComPtr<ID3DBlob> errorBlob = nullptr;
@@ -540,6 +721,61 @@ void RenderWidget::CompileShaders()
         );
 
     assert(m_domainShaderByteCode);
+
+	// =====================================================
+	// Shadow shaders
+	// =====================================================
+
+	m_shadowBasicVertexShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Shadow.hlsl",
+			nullptr,
+			"VS_BasicShadow",
+			"vs_5_0"
+		);
+
+	assert(
+		m_shadowBasicVertexShaderByteCode
+	);
+
+
+	m_shadowTerrainVertexShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Shadow.hlsl",
+			nullptr,
+			"VS_TerrainShadow",
+			"vs_5_0"
+		);
+
+	assert(
+		m_shadowTerrainVertexShaderByteCode
+	);
+
+
+	m_shadowTerrainHullShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Shadow.hlsl",
+			nullptr,
+			"HS_TerrainShadow",
+			"hs_5_0"
+		);
+
+	assert(
+		m_shadowTerrainHullShaderByteCode
+	);
+
+
+	m_shadowTerrainDomainShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Shadow.hlsl",
+			nullptr,
+			"DS_TerrainShadow",
+			"ds_5_0"
+		);
+
+	assert(
+		m_shadowTerrainDomainShaderByteCode
+	);
 }
 
 void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices, MeshBuffer& mesh)
@@ -1074,6 +1310,291 @@ void RenderWidget::CreateGraphicPipelines()
             IID_PPV_ARGS(&m_tessellationPipelineState)
         )
     );
+
+	// =====================================================
+	// SHADOW PIPELINE - CUBE
+	// =====================================================
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC>
+		shadowBasicInputLayout =
+	{
+		{
+			"POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			0,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		}
+	};
+
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC
+		shadowBasicPsoDesc = {};
+
+	shadowBasicPsoDesc.InputLayout =
+	{
+		shadowBasicInputLayout.data(),
+		static_cast<UINT>(
+			shadowBasicInputLayout.size()
+		)
+	};
+
+	shadowBasicPsoDesc.pRootSignature =
+		m_rootSignature.Get();
+
+	shadowBasicPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_shadowBasicVertexShaderByteCode
+				->GetBufferPointer()
+		),
+		m_shadowBasicVertexShaderByteCode
+			->GetBufferSize()
+	};
+
+
+	// No pixel shader.
+	// Shadow pass writes depth only.
+
+	shadowBasicPsoDesc.RasterizerState =
+		CD3DX12_RASTERIZER_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowBasicPsoDesc.RasterizerState.CullMode =
+		D3D12_CULL_MODE_NONE;
+
+
+	// Bias helps prevent shadow acne.
+	shadowBasicPsoDesc.RasterizerState.DepthBias =
+		1000;
+
+	shadowBasicPsoDesc.RasterizerState
+		.SlopeScaledDepthBias =
+		1.0f;
+
+	shadowBasicPsoDesc.RasterizerState
+		.DepthBiasClamp =
+		0.0f;
+
+
+	shadowBasicPsoDesc.BlendState =
+		CD3DX12_BLEND_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowBasicPsoDesc.DepthStencilState =
+		CD3DX12_DEPTH_STENCIL_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowBasicPsoDesc.SampleMask =
+		UINT_MAX;
+
+	shadowBasicPsoDesc.PrimitiveTopologyType =
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+
+
+	// Depth-only pass.
+	shadowBasicPsoDesc.NumRenderTargets = 0;
+
+	shadowBasicPsoDesc.DSVFormat =
+		ShadowMapDSVFormat;
+
+	shadowBasicPsoDesc.SampleDesc.Count = 1;
+	shadowBasicPsoDesc.SampleDesc.Quality = 0;
+
+
+	ThrowIfFailed(
+		m_dxDevice->CreateGraphicsPipelineState(
+			&shadowBasicPsoDesc,
+			IID_PPV_ARGS(
+				&m_shadowBasicPipelineState
+			)
+		)
+	);
+
+	// =====================================================
+	// SHADOW PIPELINE - TESSELLATED TERRAIN
+	// =====================================================
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC>
+		shadowTerrainInputLayout =
+	{
+		{
+			"POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			0,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		},
+		{
+			"TEXCOORD",
+			0,
+			DXGI_FORMAT_R32G32_FLOAT,
+			0,
+			24,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		}
+	};
+
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC
+		shadowTerrainPsoDesc = {};
+
+	shadowTerrainPsoDesc.InputLayout =
+	{
+		shadowTerrainInputLayout.data(),
+		static_cast<UINT>(
+			shadowTerrainInputLayout.size()
+		)
+	};
+
+	shadowTerrainPsoDesc.pRootSignature =
+		m_rootSignature.Get();
+
+
+	shadowTerrainPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_shadowTerrainVertexShaderByteCode
+				->GetBufferPointer()
+		),
+		m_shadowTerrainVertexShaderByteCode
+			->GetBufferSize()
+	};
+
+	shadowTerrainPsoDesc.HS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_shadowTerrainHullShaderByteCode
+				->GetBufferPointer()
+		),
+		m_shadowTerrainHullShaderByteCode
+			->GetBufferSize()
+	};
+
+	shadowTerrainPsoDesc.DS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_shadowTerrainDomainShaderByteCode
+				->GetBufferPointer()
+		),
+		m_shadowTerrainDomainShaderByteCode
+			->GetBufferSize()
+	};
+
+
+	shadowTerrainPsoDesc.RasterizerState =
+		CD3DX12_RASTERIZER_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowTerrainPsoDesc.RasterizerState.CullMode =
+		D3D12_CULL_MODE_NONE;
+
+	shadowTerrainPsoDesc.RasterizerState.DepthBias =
+		1000;
+
+	shadowTerrainPsoDesc.RasterizerState
+		.SlopeScaledDepthBias =
+		1.0f;
+
+	shadowTerrainPsoDesc.RasterizerState
+		.DepthBiasClamp =
+		0.0f;
+
+
+	shadowTerrainPsoDesc.BlendState =
+		CD3DX12_BLEND_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowTerrainPsoDesc.DepthStencilState =
+		CD3DX12_DEPTH_STENCIL_DESC(
+			D3D12_DEFAULT
+		);
+
+	shadowTerrainPsoDesc.SampleMask =
+		UINT_MAX;
+
+	shadowTerrainPsoDesc.PrimitiveTopologyType =
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE_PATCH;
+
+	shadowTerrainPsoDesc.NumRenderTargets = 0;
+
+	shadowTerrainPsoDesc.DSVFormat =
+		ShadowMapDSVFormat;
+
+	shadowTerrainPsoDesc.SampleDesc.Count = 1;
+	shadowTerrainPsoDesc.SampleDesc.Quality = 0;
+
+
+	ThrowIfFailed(
+		m_dxDevice->CreateGraphicsPipelineState(
+			&shadowTerrainPsoDesc,
+			IID_PPV_ARGS(
+				&m_shadowTerrainPipelineState
+			)
+		)
+	);
+}
+
+// =====================================================
+// LIGHT VIEW / PROJECTION
+// =====================================================
+
+DirectX::XMMATRIX
+RenderWidget::GetLightViewProjectionMatrix() const
+{
+	DirectX::XMVECTOR lightDirection =
+		DirectX::XMLoadFloat3(
+			&m_sceneConstants.LightDirection
+		);
+
+	lightDirection =
+		DirectX::XMVector3Normalize(
+			lightDirection
+		);
+
+	DirectX::XMVECTOR lightPosition =
+		DirectX::XMVectorScale(
+			lightDirection,
+			-10.0f
+		);
+
+	DirectX::XMVECTOR target =
+		DirectX::XMVectorZero();
+
+	DirectX::XMVECTOR up =
+		DirectX::XMVectorSet(
+			0.0f,
+			1.0f,
+			0.0f,
+			0.0f
+		);
+
+	DirectX::XMMATRIX lightView =
+		DirectX::XMMatrixLookAtLH(
+			lightPosition,
+			target,
+			up
+		);
+
+	DirectX::XMMATRIX lightProjection =
+		DirectX::XMMatrixOrthographicLH(
+			10.0f,
+			10.0f,
+			1.0f,
+			30.0f
+		);
+
+	return lightView * lightProjection;
 }
 
 void RenderWidget::UpdateObjectConstantBuffer(
@@ -1089,6 +1610,12 @@ void RenderWidget::UpdateObjectConstantBuffer(
 	DirectX::XMMATRIX worldViewProjection =
 		world * view * projection;
 
+	DirectX::XMMATRIX lightViewProjection =
+		GetLightViewProjectionMatrix();
+
+	DirectX::XMMATRIX worldLightViewProjection =
+		world *	lightViewProjection;
+
 	ObjectConstants constants;
 
 	DirectX::XMStoreFloat4x4(
@@ -1100,6 +1627,13 @@ void RenderWidget::UpdateObjectConstantBuffer(
 		&constants.WorldViewProj,
 		DirectX::XMMatrixTranspose(
 			worldViewProjection
+		)
+	);
+
+	DirectX::XMStoreFloat4x4(
+		&constants.WorldLightViewProj,
+		DirectX::XMMatrixTranspose(
+			worldLightViewProjection
 		)
 	);
 
@@ -1120,11 +1654,9 @@ void RenderWidget::UpdateObjectConstantBuffer(
 
 void RenderWidget::UpdateSceneConstantBuffer()
 {
-	SceneConstants sceneConstants;
-
 	memcpy(
 		m_sceneMappedData,
-		&sceneConstants,
+		&m_sceneConstants,
 		sizeof(SceneConstants)
 	);
 }
@@ -1172,11 +1704,213 @@ void RenderWidget::UpdateWorldViewProjectionBuffer()
 	);
 }
 
+void RenderWidget::RenderShadowPass()
+{
+	// =====================================================
+	// Prepare shadow map for depth writing
+	// =====================================================
+
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			m_shadowMap.Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			D3D12_RESOURCE_STATE_DEPTH_WRITE
+		)
+	);
+
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE shadowDsvHandle(
+		m_dsvDescriptorHeap
+		->GetCPUDescriptorHandleForHeapStart(),
+		1,
+		m_dsvDescriptorSize
+	);
+
+
+	m_commandList->ClearDepthStencilView(
+		shadowDsvHandle,
+		D3D12_CLEAR_FLAG_DEPTH,
+		1.0f,
+		0,
+		0,
+		nullptr
+	);
+
+
+	m_commandList->RSSetViewports(
+		1,
+		&m_shadowViewport
+	);
+
+	m_commandList->RSSetScissorRects(
+		1,
+		&m_shadowScissorRect
+	);
+
+
+	// No color render target.
+	m_commandList->OMSetRenderTargets(
+		0,
+		nullptr,
+		false,
+		&shadowDsvHandle
+	);
+
+
+	m_commandList->SetGraphicsRootSignature(
+		m_rootSignature.Get()
+	);
+
+
+	// Terrain shadow shader needs the height map at t1.
+	ID3D12DescriptorHeap* descriptorHeaps[] =
+	{
+		m_srvDescriptorHeap.Get()
+	};
+
+	m_commandList->SetDescriptorHeaps(
+		_countof(descriptorHeaps),
+		descriptorHeaps
+	);
+
+
+	CD3DX12_GPU_DESCRIPTOR_HANDLE textureHandle(
+		m_srvDescriptorHeap
+		->GetGPUDescriptorHandleForHeapStart()
+	);
+
+	m_commandList->SetGraphicsRootDescriptorTable(
+		1,
+		textureHandle
+	);
+
+
+	// =====================================================
+	// CUBE -> SHADOW MAP
+	// =====================================================
+
+	m_commandList->SetPipelineState(
+		m_shadowBasicPipelineState.Get()
+	);
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS cubeCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress();
+
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		cubeCBAddress
+	);
+
+
+	D3D12_VERTEX_BUFFER_VIEW cubeVBV =
+		m_basicMesh.VertexBufferView();
+
+	D3D12_INDEX_BUFFER_VIEW cubeIBV =
+		m_basicMesh.IndexBufferView();
+
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&cubeVBV
+	);
+
+	m_commandList->IASetIndexBuffer(
+		&cubeIBV
+	);
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST
+	);
+
+
+	m_commandList->DrawIndexedInstanced(
+		m_basicMesh.NumberOfIndices,
+		1,
+		0,
+		0,
+		0
+	);
+
+
+	// =====================================================
+	// TERRAIN -> SHADOW MAP
+	// =====================================================
+
+	m_commandList->SetPipelineState(
+		m_shadowTerrainPipelineState.Get()
+	);
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS terrainCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress()
+		+
+		m_objectConstantBufferByteSize;
+
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		terrainCBAddress
+	);
+
+
+	D3D12_VERTEX_BUFFER_VIEW terrainVBV =
+		m_tessellationMesh.VertexBufferView();
+
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&terrainVBV
+	);
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_4_CONTROL_POINT_PATCHLIST
+	);
+
+
+	m_commandList->DrawInstanced(
+		m_tessellationMesh.NumberOfVertices,
+		1,
+		0,
+		0
+	);
+
+
+	// =====================================================
+	// Shadow map becomes readable by main pass
+	// =====================================================
+
+	m_commandList->ResourceBarrier(
+		1,
+		&CD3DX12_RESOURCE_BARRIER::Transition(
+			m_shadowMap.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE,
+			D3D12_RESOURCE_STATE_GENERIC_READ
+		)
+	);
+}
+
 void RenderWidget::Draw()
 {
 	m_directCmdListAlloc->Reset();
 
 	ResetCommandList(
+		m_shadowBasicPipelineState.Get()
+	);
+
+	// First pass:
+	// render scene depth from light's perspective.
+	RenderShadowPass();
+
+	// Second pass:
+	// normal camera rendering.
+	m_commandList->SetPipelineState(
 		m_basicPipelineState.Get()
 	);
 

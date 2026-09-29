@@ -58,6 +58,9 @@
     <CopyFileToFolders Include="Basic.hlsl">
       <Filter>Resources</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="Shadow.hlsl">
+      <Filter>Resources</Filter>
+    </CopyFileToFolders>
     <CopyFileToFolders Include="height_map.png">
       <Filter>Resources</Filter>
     </CopyFileToFolders>

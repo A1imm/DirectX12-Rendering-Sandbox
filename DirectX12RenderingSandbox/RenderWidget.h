@@ -7,6 +7,7 @@ struct ObjectConstants
 {
     DirectX::XMFLOAT4X4 World = Geometry::Identity4x4();
     DirectX::XMFLOAT4X4 WorldViewProj = Geometry::Identity4x4();
+    DirectX::XMFLOAT4X4 WorldLightViewProj = Geometry::Identity4x4();
     DirectX::XMFLOAT3 CameraPosition = { 0.0f, 0.0f, 0.0f };
     float Padding = 0.0f;
 };
@@ -56,6 +57,8 @@ public:
     
 private:
     UINT m_rtvDescriptorSize = 0;
+    UINT m_dsvDescriptorSize = 0;
+    UINT m_srvDescriptorSize = 0;
 	//DirectX12 objects
     void CreateDXDeviceAndFactory();
     void CreateSwapChain(unsigned int width, unsigned int height);
@@ -96,6 +99,30 @@ private:
     const static DXGI_FORMAT DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
     Microsoft::WRL::ComPtr<ID3D12Resource> m_depthStencilBuffer;
 
+    // Shadow mapping
+    void CreateShadowMap();
+    void RenderShadowPass();
+
+    DirectX::XMMATRIX
+        GetLightViewProjectionMatrix() const;
+
+    static constexpr UINT ShadowMapSize = 2048;
+
+    static const DXGI_FORMAT ShadowMapResourceFormat =
+        DXGI_FORMAT_R24G8_TYPELESS;
+
+    static const DXGI_FORMAT ShadowMapDSVFormat =
+        DXGI_FORMAT_D24_UNORM_S8_UINT;
+
+    static const DXGI_FORMAT ShadowMapSRVFormat =
+        DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+
+    Microsoft::WRL::ComPtr<ID3D12Resource>
+        m_shadowMap;
+
+    D3D12_VIEWPORT m_shadowViewport;
+    D3D12_RECT m_shadowScissorRect;
+
     // Constant buffers
     void CreateWorldViewProjectionMatrixBuffer();
     void CreateSceneConstantBuffer();
@@ -119,6 +146,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12Resource>
         m_cbScene;
 
+    SceneConstants m_sceneConstants;
     //Shaders
     void CompileShaders();
 
@@ -132,6 +160,12 @@ private:
     Microsoft::WRL::ComPtr<ID3DBlob> m_hullShaderByteCode;
     Microsoft::WRL::ComPtr<ID3DBlob> m_domainShaderByteCode;
 
+    // Shadow pipeline
+    Microsoft::WRL::ComPtr<ID3DBlob> m_shadowBasicVertexShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_shadowTerrainVertexShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_shadowTerrainHullShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_shadowTerrainDomainShaderByteCode;
+
     // Pipeline states and Root signature
     void BuildRootSignature();
     void CreateGraphicPipelines();
@@ -139,6 +173,8 @@ private:
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_basicPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowBasicPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowTerrainPipelineState;
 
 
     // Textures
