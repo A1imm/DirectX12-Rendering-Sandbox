@@ -51,6 +51,7 @@ public:
     void Initialize();
     void Draw();
     void Resize(int width, int height);
+    void ToggleTerrainWireframe();
     Geometry::Camera& GetCamera() {
         return m_camera;
     }
@@ -178,9 +179,12 @@ private:
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_basicPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationWireframePipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowBasicPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowTerrainPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_billboardPipelineState;
+
+    bool m_terrainWireframeEnabled = false;
 
     // Textures
     struct TextureResource

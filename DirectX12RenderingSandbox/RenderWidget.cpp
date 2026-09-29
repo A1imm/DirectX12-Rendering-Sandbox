@@ -1369,6 +1369,25 @@ void RenderWidget::CreateGraphicPipelines()
     );
 
 	// =====================================================
+	// TERRAIN WIREFRAME PIPELINE
+	// =====================================================
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC
+		tessWireframePsoDesc = tessPsoDesc;
+
+	tessWireframePsoDesc.RasterizerState.FillMode =
+		D3D12_FILL_MODE_WIREFRAME;
+
+	ThrowIfFailed(
+		m_dxDevice->CreateGraphicsPipelineState(
+			&tessWireframePsoDesc,
+			IID_PPV_ARGS(
+				&m_tessellationWireframePipelineState
+			)
+		)
+	);
+
+	// =====================================================
 	// SHADOW PIPELINE - CUBE
 	// =====================================================
 
@@ -2084,6 +2103,27 @@ void RenderWidget::RenderShadowPass()
 	);
 }
 
+void RenderWidget::ToggleTerrainWireframe()
+{
+	m_terrainWireframeEnabled =
+		!m_terrainWireframeEnabled;
+
+#if defined(DEBUG) || defined(_DEBUG)
+	if (m_terrainWireframeEnabled)
+	{
+		OutputDebugStringA(
+			"Terrain render mode: WIREFRAME\n"
+		);
+	}
+	else
+	{
+		OutputDebugStringA(
+			"Terrain render mode: SOLID\n"
+		);
+	}
+#endif
+}
+
 void RenderWidget::Draw()
 {
 	m_directCmdListAlloc->Reset();
@@ -2230,8 +2270,13 @@ void RenderWidget::Draw()
 	// TERRAIN - TESSELLATION PIPELINE
 	// =====================================================
 
+	ID3D12PipelineState* terrainPipelineState =
+		m_terrainWireframeEnabled
+		? m_tessellationWireframePipelineState.Get()
+		: m_tessellationPipelineState.Get();
+
 	m_commandList->SetPipelineState(
-		m_tessellationPipelineState.Get()
+		terrainPipelineState
 	);
 
 	D3D12_GPU_VIRTUAL_ADDRESS terrainCBAddress =

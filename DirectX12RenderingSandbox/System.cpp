@@ -61,6 +61,20 @@ LRESULT CALLBACK System::MessageHandler(HWND hwnd, UINT msg, WPARAM wparam, LPAR
 				return 0;
 			}
 
+			if (
+				wparam == 'W' &&
+				(lparam & 0x40000000) == 0
+				)
+			{
+				if (m_renderWidget)
+				{
+					m_renderWidget
+						->ToggleTerrainWireframe();
+				}
+
+				return 0;
+			}
+
 			break;
 		}
 
