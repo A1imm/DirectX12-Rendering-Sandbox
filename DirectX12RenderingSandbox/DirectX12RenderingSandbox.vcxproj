@@ -128,6 +128,7 @@
     <CopyFileToFolders Include="height_map.png" />
     <CopyFileToFolders Include="WoodCrate.png" />
     <CopyFileToFolders Include="grass-02.png" />
+    <CopyFileToFolders Include="WoodCrateNormal.png" />
 </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

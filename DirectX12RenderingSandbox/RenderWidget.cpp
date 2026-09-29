@@ -48,6 +48,12 @@ void RenderWidget::Initialize()
 		2
 	);
 
+	LoadTexture(
+		L"WoodCrateNormal.png",
+		m_cubeNormalMap,
+		3
+	);
+
 	//3. Initialize Graphic Pipeline
 	BuildRootSignature();
 	CreateGraphicPipelines();
@@ -183,7 +189,7 @@ void RenderWidget::CreateDescriptorHeaps()
 
 	// Shader Resource View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 3;
+	srvHeapDesc.NumDescriptors = 4;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	result = m_dxDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvDescriptorHeap));
@@ -424,7 +430,7 @@ void RenderWidget::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE resourceTable;
 	resourceTable.Init(
 		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		3,
+		4,
 		0
 	);
 
@@ -889,6 +895,15 @@ void RenderWidget::CreateGraphicPipelines()
 			DXGI_FORMAT_R32G32_FLOAT,
 			0,
 			24,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		},
+		{
+			"TANGENT",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			32,
 			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
 			0
 		}

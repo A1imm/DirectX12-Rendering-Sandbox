@@ -22,6 +22,7 @@ cbuffer cbScene : register(b1)
 };
 
 Texture2D gTexture : register(t0);
+Texture2D gNormalMap : register(t3);
 SamplerState gSampler : register(s0);
 
 struct VertexInput
@@ -29,15 +30,15 @@ struct VertexInput
     float3 Position : POSITION;
     float3 Normal : NORMAL;
     float2 UV : TEXCOORD;
+    float3 Tangent : TANGENT;
 };
 
 struct VertexOutput
 {
     float4 Position : SV_POSITION;
-
     float3 WorldPosition : POSITION0;
     float3 WorldNormal : NORMAL;
-
+    float3 WorldTangent : TANGENT;
     float2 UV : TEXCOORD;
 };
 
@@ -68,6 +69,13 @@ VertexOutput VS_Main(VertexInput input)
                 (float3x3) gWorld
             )
         );
+    output.WorldTangent =
+    normalize(
+        mul(
+            input.Tangent,
+            (float3x3) gWorld
+        )
+    );
 
     output.UV = input.UV;
 
@@ -82,8 +90,58 @@ float4 PS_Main(VertexOutput input) : SV_Target
             input.UV
         );
 
+    // Sample tangent-space normal.
+    // Texture stores values in [0, 1], so convert them to [-1, 1].
+    float3 tangentNormal =
+        gNormalMap.Sample(
+            gSampler,
+            input.UV
+        ).xyz;
+
+    tangentNormal = tangentNormal * 2.0f - 1.0f;
+
+
+    // Build orthonormal tangent basis.
     float3 normal =
-        normalize(input.WorldNormal);
+    normalize(
+        input.WorldNormal
+    );
+
+    float3 tangent =
+    normalize(
+        input.WorldTangent
+        -
+        normal *
+        dot(
+            input.WorldTangent,
+            normal
+        )
+    );
+
+    float3 bitangent =
+    normalize(
+        cross(
+            normal,
+            tangent
+        )
+    );
+
+
+    // Tangent space -> world space.
+    float3x3 TBN =
+    float3x3(
+        tangent,
+        bitangent,
+        normal
+    );
+
+    normal =
+    normalize(
+        mul(
+            tangentNormal,
+            TBN
+        )
+    );
 
     float3 lightDirection =
     normalize(gLightDirection);

@@ -157,6 +157,7 @@ private:
     TextureResource m_cubeTexture;
     TextureResource m_terrainHeightMap;
     TextureResource m_terrainTexture;
+    TextureResource m_cubeNormalMap;
 
 
     //Viewport
