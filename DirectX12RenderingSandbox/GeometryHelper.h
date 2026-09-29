@@ -119,7 +119,17 @@ namespace Geometry
 		return
 		{
 			Vertex(
-				DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f),
+				DirectX::XMFLOAT3(0.9f, -0.55f, 0.0f),
+				DirectX::XMFLOAT2(0.0f, 0.0f)
+			),
+
+			Vertex(
+				DirectX::XMFLOAT3(1.4f, -0.55f, -0.35f),
+				DirectX::XMFLOAT2(0.0f, 0.0f)
+			),
+
+			Vertex(
+				DirectX::XMFLOAT3(0.4f, -0.55f, 0.35f),
 				DirectX::XMFLOAT2(0.0f, 0.0f)
 			)
 		};

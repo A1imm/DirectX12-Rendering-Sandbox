@@ -199,6 +199,7 @@ private:
     TextureResource m_terrainHeightMap;
     TextureResource m_terrainTexture;
     TextureResource m_cubeNormalMap;
+    TextureResource m_billboardTexture;
 
 
     //Viewport

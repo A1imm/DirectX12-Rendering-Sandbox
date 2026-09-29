@@ -55,6 +55,12 @@ void RenderWidget::Initialize()
 		3
 	);
 
+	LoadTexture(
+		L"BushBillboard.png",
+		m_billboardTexture,
+		5
+	);
+
 	//3. Initialize Graphic Pipeline
 	BuildRootSignature();
 	CreateGraphicPipelines();
@@ -194,7 +200,7 @@ void RenderWidget::CreateDescriptorHeaps()
 
 	// Shader Resource View heap descriptor
 	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
-	srvHeapDesc.NumDescriptors = 5;
+	srvHeapDesc.NumDescriptors = 6;
 	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	srvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	result = m_dxDevice->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvDescriptorHeap));
@@ -587,7 +593,7 @@ void RenderWidget::BuildRootSignature()
 	CD3DX12_DESCRIPTOR_RANGE resourceTable;
 	resourceTable.Init(
 		D3D12_DESCRIPTOR_RANGE_TYPE_SRV,
-		5,
+		6,
 		0
 	);
 
@@ -2065,58 +2071,6 @@ void RenderWidget::RenderShadowPass()
 	);
 
 	// =====================================================
-	// BILLBOARDS - GEOMETRY SHADER PIPELINE
-	// =====================================================
-
-	m_commandList->SetPipelineState(
-		m_billboardPipelineState.Get()
-	);
-
-
-	D3D12_GPU_VIRTUAL_ADDRESS billboardCBAddress =
-		m_cbWVProjectionMatrix
-		->GetGPUVirtualAddress()
-		+
-		2 * m_objectConstantBufferByteSize;
-
-
-	m_commandList->SetGraphicsRootConstantBufferView(
-		0,
-		billboardCBAddress
-	);
-
-
-	D3D12_VERTEX_BUFFER_VIEW billboardVBV =
-		m_billboardMesh.VertexBufferView();
-
-
-	m_commandList->IASetVertexBuffers(
-		0,
-		1,
-		&billboardVBV
-	);
-
-
-	m_commandList->IASetIndexBuffer(
-		nullptr
-	);
-
-
-	m_commandList->IASetPrimitiveTopology(
-		D3D11_PRIMITIVE_TOPOLOGY_POINTLIST
-	);
-
-
-	m_commandList->DrawInstanced(
-		static_cast<UINT>(
-			m_billboardMesh.NumberOfVertices
-			),
-		1,
-		0,
-		0
-	);
-
-	// =====================================================
 	// Shadow map becomes readable by main pass
 	// =====================================================
 
@@ -2311,6 +2265,50 @@ void RenderWidget::Draw()
 		0
 	);
 
+	// =====================================================
+// BILLBOARDS - GEOMETRY SHADER PIPELINE
+// =====================================================
+
+	m_commandList->SetPipelineState(
+		m_billboardPipelineState.Get()
+	);
+
+	D3D12_GPU_VIRTUAL_ADDRESS billboardCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress()
+		+
+		2 * m_objectConstantBufferByteSize;
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		billboardCBAddress
+	);
+
+	D3D12_VERTEX_BUFFER_VIEW billboardVBV =
+		m_billboardMesh.VertexBufferView();
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&billboardVBV
+	);
+
+	m_commandList->IASetIndexBuffer(
+		nullptr
+	);
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_POINTLIST
+	);
+
+	m_commandList->DrawInstanced(
+		static_cast<UINT>(
+			m_billboardMesh.NumberOfVertices
+			),
+		1,
+		0,
+		0
+	);
 
 	// Present
 	m_commandList->ResourceBarrier(

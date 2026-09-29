@@ -8,7 +8,7 @@ cbuffer cbPerObject : register(b0)
     float gPadding;
 };
 
-Texture2D gBillboardTexture : register(t2);
+Texture2D gBillboardTexture : register(t5);
 SamplerState gSampler : register(s0);
 
 
@@ -46,66 +46,55 @@ void GS_Main(
     point VertexOutput input[1],
     inout TriangleStream<GeometryOutput> outputStream)
 {
-    // Billboard point positions are currently stored directly
-    // in world space. The billboard object therefore uses an
-    // identity World matrix.
-
     float3 center =
         input[0].Position;
 
+    // Direction to camera, but only in XZ plane.
+    // This keeps the billboard vertical.
     float3 toCamera =
-        normalize(
-            gCameraPosition -
-            center
+        float3(
+            gCameraPosition.x - center.x,
+            0.0f,
+            gCameraPosition.z - center.z
         );
 
+    toCamera =
+        normalize(toCamera);
 
-    // Prevent instability when the camera is almost directly
-    // above or below the billboard.
-    float3 upGuide =
-        abs(toCamera.y) > 0.99f
-        ? float3(0.0f, 0.0f, 1.0f)
-        : float3(0.0f, 1.0f, 0.0f);
-
+    const float3 worldUp =
+        float3(
+            0.0f,
+            1.0f,
+            0.0f
+        );
 
     float3 right =
         normalize(
             cross(
-                upGuide,
+                worldUp,
                 toCamera
             )
         );
 
-    float3 up =
-        normalize(
-            cross(
-                toCamera,
-                right
-            )
-        );
-
-
     const float halfWidth = 0.30f;
-    const float halfHeight = 0.45f;
+    const float height = 0.90f;
 
-
+    // center represents the bottom-center of the billboard.
     float3 bottomLeft =
-        center
-        - right * halfWidth;
-
-    float3 topLeft =
-        center
-        - right * halfWidth
-        + up * (2.0f * halfHeight);
+        center -
+        right * halfWidth;
 
     float3 bottomRight =
-        center
-        + right * halfWidth;
+        center +
+        right * halfWidth;
+
+    float3 topLeft =
+        bottomLeft +
+        worldUp * height;
 
     float3 topRight =
-        center
-        + right * halfWidth
-        + up * (2.0f * halfHeight);
+        bottomRight +
+        worldUp * height;
 
 
     GeometryOutput output;
@@ -169,10 +158,13 @@ void GS_Main(
 float4 PS_Main(
     GeometryOutput input) : SV_Target
 {
-    return float4(
-        1.0f,
-        0.0f,
-        1.0f,
-        1.0f
-    );
+    float4 color =
+        gBillboardTexture.Sample(
+            gSampler,
+            input.UV
+        );
+
+    clip(color.a - 0.30f);
+
+    return color;
 }

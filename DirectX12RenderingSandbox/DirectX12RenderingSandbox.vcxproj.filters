@@ -76,5 +76,8 @@
     <CopyFileToFolders Include="WoodCrateNormal.png">
       <Filter>Resources</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="BushBillboard.png">
+      <Filter>Resources</Filter>
+    </CopyFileToFolders>
   </ItemGroup>
 </Project>
