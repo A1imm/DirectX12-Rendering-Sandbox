@@ -1025,8 +1025,8 @@ void RenderWidget::CreateGraphicPipelines()
     tessPsoDesc.RasterizerState =
         CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 
-    tessPsoDesc.RasterizerState.FillMode =
-        D3D12_FILL_MODE_WIREFRAME;
+	tessPsoDesc.RasterizerState.FillMode =
+		D3D12_FILL_MODE_SOLID;
 
     tessPsoDesc.RasterizerState.CullMode =
         D3D12_CULL_MODE_NONE;

@@ -7,6 +7,20 @@ cbuffer cbPerObject : register(b0)
     float gPadding;
 };
 
+cbuffer cbScene : register(b1)
+{
+    float3 gLightDirection;
+    float gLightIntensity;
+
+    float3 gLightColor;
+    float gAmbientStrength;
+
+    float gSpecularStrength;
+    float gShininess;
+
+    float2 gScenePadding;
+};
+
 struct VertexData
 {
 	float3 PosL  : POSITION;
@@ -76,6 +90,8 @@ HullOut HS_Main(InputPatch<VertexData, 4> p, uint i : SV_OutputControlPointID, u
 struct DomainOut
 {
 	float4 PosH : SV_POSITION;
+    float3 WorldPosition : POSITION0;
+    float3 WorldNormal : NORMAL;
 	float2 uv : TEXCOORD0;
 };
 
@@ -86,29 +102,229 @@ Texture2D gTerrainTexture : register(t2);
 SamplerState gSampler : register(s0);
 
 [domain("quad")]
-DomainOut DS_Main(PatchTess patchTess, float2 uv : SV_DomainLocation, const OutputPatch<HullOut, 4> quad)
+DomainOut DS_Main(
+    PatchTess patchTess,
+    float2 uv : SV_DomainLocation,
+    const OutputPatch<HullOut, 4> quad)
 {
     DomainOut dout;
 
-    float3 v1 = lerp(quad[0].PosL, quad[1].PosL, uv.x);
-    float3 v2 = lerp(quad[3].PosL, quad[2].PosL, uv.x);
-    float3 p = lerp(v1, v2, uv.y);
+    // Interpolate local position across the quad patch.
+    float3 v1 =
+        lerp(
+            quad[0].PosL,
+            quad[1].PosL,
+            uv.x
+        );
 
-    float2 uv_v1 = lerp(quad[0].uv, quad[1].uv, uv.x);
-    float2 uv_v2 = lerp(quad[3].uv, quad[2].uv, uv.x);
-    dout.uv = lerp(uv_v1, uv_v2, uv.y);
+    float3 v2 =
+        lerp(
+            quad[3].PosL,
+            quad[2].PosL,
+            uv.x
+        );
 
-    float height = gHeightMap.SampleLevel(gSampler, dout.uv, 0).r;
+    float3 p =
+        lerp(
+            v1,
+            v2,
+            uv.y
+        );
 
-    p.y += height * 0.3f;
 
-    dout.PosH = mul(float4(p, 1.0f), gWorldViewProj);
+    // Interpolate texture coordinates.
+    float2 uvV1 =
+        lerp(
+            quad[0].uv,
+            quad[1].uv,
+            uv.x
+        );
+
+    float2 uvV2 =
+        lerp(
+            quad[3].uv,
+            quad[2].uv,
+            uv.x
+        );
+
+    dout.uv =
+        lerp(
+            uvV1,
+            uvV2,
+            uv.y
+        );
+
+
+    // =====================================================
+    // HEIGHT DISPLACEMENT
+    // =====================================================
+
+    const float heightScale = 0.3f;
+
+    float height =
+        gHeightMap.SampleLevel(
+            gSampler,
+            dout.uv,
+            0
+        ).r;
+
+    p.y += height * heightScale;
+
+
+    // =====================================================
+    // NORMAL FROM HEIGHT MAP
+    // =====================================================
+
+    uint textureWidth;
+    uint textureHeight;
+
+    gHeightMap.GetDimensions(
+        textureWidth,
+        textureHeight
+    );
+
+    float2 texelSize =
+        float2(
+            1.0f / textureWidth,
+            1.0f / textureHeight
+        );
+
+    float heightUPositive =
+        gHeightMap.SampleLevel(
+            gSampler,
+            dout.uv + float2(texelSize.x, 0.0f),
+            0
+        ).r;
+
+    float heightUNegative =
+        gHeightMap.SampleLevel(
+            gSampler,
+            dout.uv - float2(texelSize.x, 0.0f),
+            0
+        ).r;
+
+    float heightVPositive =
+        gHeightMap.SampleLevel(
+            gSampler,
+            dout.uv + float2(0.0f, texelSize.y),
+            0
+        ).r;
+
+    float heightVNegative =
+        gHeightMap.SampleLevel(
+            gSampler,
+            dout.uv - float2(0.0f, texelSize.y),
+            0
+        ).r;
+
+
+    // Texture U corresponds to local Z.
+    float3 tangentZ =
+        float3(
+            0.0f,
+            (heightUPositive - heightUNegative)
+                * heightScale,
+            4.0f * texelSize.x
+        );
+
+    // Texture V is inverted relative to local X.
+    float3 tangentX =
+        float3(
+            4.0f * texelSize.y,
+            (heightVNegative - heightVPositive)
+                * heightScale,
+            0.0f
+        );
+
+    float3 localNormal =
+        normalize(
+            cross(
+                tangentZ,
+                tangentX
+            )
+        );
+
+
+    // =====================================================
+    // WORLD SPACE OUTPUT
+    // =====================================================
+
+    float4 worldPosition =
+        mul(
+            float4(p, 1.0f),
+            gWorld
+        );
+
+    dout.WorldPosition =
+        worldPosition.xyz;
+
+    // Correct for our current uniform terrain scaling.
+    dout.WorldNormal =
+        normalize(
+            mul(
+                localNormal,
+                (float3x3) gWorld
+            )
+        );
+
+    dout.PosH =
+        mul(
+            float4(p, 1.0f),
+            gWorldViewProj
+        );
 
     return dout;
 }
 
 /*----------------PIXEL SHADER------------------------------------------*/
-float4 PS_Main(DomainOut pin) : SV_Target
+float4 PS_Main(DomainOut input, bool isFrontFace : SV_IsFrontFace) : SV_Target
 {
-    return gTerrainTexture.Sample(gSampler, pin.uv);
+    float4 albedo =
+        gTerrainTexture.Sample(
+            gSampler,
+            input.uv
+        );
+
+    float3 normal =
+    normalize(
+        input.WorldNormal
+    );
+
+    if (!isFrontFace)
+    {
+        normal = -normal;
+    }
+
+    float3 lightDirection =
+        normalize(
+            gLightDirection
+        );
+
+    float3 toLight =
+        -lightDirection;
+
+    // Lambert diffuse
+    float diffuseStrength =
+        saturate(
+            dot(
+                normal,
+                toLight
+            )
+        );
+
+    float3 lighting =
+        gAmbientStrength
+        +
+        gLightColor
+        * gLightIntensity
+        * diffuseStrength;
+
+    float3 finalColor =
+        albedo.rgb
+        * lighting;
+
+    return float4(
+        finalColor,
+        albedo.a
+    );
 }
