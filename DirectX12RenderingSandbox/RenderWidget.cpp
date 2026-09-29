@@ -516,7 +516,7 @@ void RenderWidget::CreateWorldViewProjectionMatrixBuffer()
 			sizeof(ObjectConstants)
 		);
 
-	constexpr UINT objectCount = 2;
+	constexpr UINT objectCount = 3;
 
 	ThrowIfFailed(
 		m_dxDevice->CreateCommittedResource(
@@ -776,6 +776,48 @@ void RenderWidget::CompileShaders()
 	assert(
 		m_shadowTerrainDomainShaderByteCode
 	);
+
+	// =====================================================
+	// Billboard shaders
+	// =====================================================
+
+	m_billboardVertexShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Billboard.hlsl",
+			nullptr,
+			"VS_Main",
+			"vs_5_0"
+		);
+
+	assert(
+		m_billboardVertexShaderByteCode
+	);
+
+
+	m_billboardGeometryShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Billboard.hlsl",
+			nullptr,
+			"GS_Main",
+			"gs_5_0"
+		);
+
+	assert(
+		m_billboardGeometryShaderByteCode
+	);
+
+
+	m_billboardPixelShaderByteCode =
+		DirectXHelper::CompileShader(
+			L"Billboard.hlsl",
+			nullptr,
+			"PS_Main",
+			"ps_5_0"
+		);
+
+	assert(
+		m_billboardPixelShaderByteCode
+	);
 }
 
 void RenderWidget::LoadVertexBuffer(const Geometry::VertexBuffer& vertices, MeshBuffer& mesh)
@@ -945,6 +987,15 @@ void RenderWidget::LoadGeometry()
 	LoadVertexBuffer(
 		terrainVertices,
 		m_tessellationMesh
+	);
+
+	// Billboard point cloud
+	const auto billboardPoints =
+		Geometry::CreateBillboardPoints();
+
+	LoadVertexBuffer(
+		billboardPoints,
+		m_billboardMesh
 	);
 }
 
@@ -1543,6 +1594,128 @@ void RenderWidget::CreateGraphicPipelines()
 			)
 		)
 	);
+
+	// =====================================================
+	// BILLBOARD PIPELINE
+	// Point -> Geometry Shader -> camera-facing quad
+	// =====================================================
+
+	std::vector<D3D12_INPUT_ELEMENT_DESC>
+		billboardInputLayout =
+	{
+		{
+			"POSITION",
+			0,
+			DXGI_FORMAT_R32G32B32_FLOAT,
+			0,
+			0,
+			D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+			0
+		}
+	};
+
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC
+		billboardPsoDesc = {};
+
+
+	billboardPsoDesc.InputLayout =
+	{
+		billboardInputLayout.data(),
+		static_cast<UINT>(
+			billboardInputLayout.size()
+		)
+	};
+
+
+	billboardPsoDesc.pRootSignature =
+		m_rootSignature.Get();
+
+
+	billboardPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_billboardVertexShaderByteCode
+				->GetBufferPointer()
+		),
+		m_billboardVertexShaderByteCode
+			->GetBufferSize()
+	};
+
+
+	billboardPsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_billboardGeometryShaderByteCode
+				->GetBufferPointer()
+		),
+		m_billboardGeometryShaderByteCode
+			->GetBufferSize()
+	};
+
+
+	billboardPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(
+			m_billboardPixelShaderByteCode
+				->GetBufferPointer()
+		),
+		m_billboardPixelShaderByteCode
+			->GetBufferSize()
+	};
+
+
+	billboardPsoDesc.RasterizerState =
+		CD3DX12_RASTERIZER_DESC(
+			D3D12_DEFAULT
+		);
+
+	billboardPsoDesc.RasterizerState.CullMode =
+		D3D12_CULL_MODE_NONE;
+
+
+	billboardPsoDesc.BlendState =
+		CD3DX12_BLEND_DESC(
+			D3D12_DEFAULT
+		);
+
+
+	billboardPsoDesc.DepthStencilState =
+		CD3DX12_DEPTH_STENCIL_DESC(
+			D3D12_DEFAULT
+		);
+
+
+	billboardPsoDesc.SampleMask =
+		UINT_MAX;
+
+
+	billboardPsoDesc.PrimitiveTopologyType =
+		D3D12_PRIMITIVE_TOPOLOGY_TYPE_POINT;
+
+
+	billboardPsoDesc.NumRenderTargets = 1;
+
+	billboardPsoDesc.RTVFormats[0] =
+		BackBufferFormat;
+
+
+	billboardPsoDesc.DSVFormat =
+		DepthStencilFormat;
+
+
+	billboardPsoDesc.SampleDesc.Count = 1;
+	billboardPsoDesc.SampleDesc.Quality = 0;
+
+
+	ThrowIfFailed(
+		m_dxDevice->CreateGraphicsPipelineState(
+			&billboardPsoDesc,
+			IID_PPV_ARGS(
+				&m_billboardPipelineState
+			)
+		)
+	);
 }
 
 // =====================================================
@@ -1701,6 +1874,16 @@ void RenderWidget::UpdateWorldViewProjectionBuffer()
 	UpdateObjectConstantBuffer(
 		1,
 		terrainWorld
+	);
+
+	// Billboard point positions are currently stored
+	// directly in world space.
+	DirectX::XMMATRIX billboardWorld =
+		DirectX::XMMatrixIdentity();
+
+	UpdateObjectConstantBuffer(
+		2,
+		billboardWorld
 	);
 }
 
@@ -1881,6 +2064,57 @@ void RenderWidget::RenderShadowPass()
 		0
 	);
 
+	// =====================================================
+	// BILLBOARDS - GEOMETRY SHADER PIPELINE
+	// =====================================================
+
+	m_commandList->SetPipelineState(
+		m_billboardPipelineState.Get()
+	);
+
+
+	D3D12_GPU_VIRTUAL_ADDRESS billboardCBAddress =
+		m_cbWVProjectionMatrix
+		->GetGPUVirtualAddress()
+		+
+		2 * m_objectConstantBufferByteSize;
+
+
+	m_commandList->SetGraphicsRootConstantBufferView(
+		0,
+		billboardCBAddress
+	);
+
+
+	D3D12_VERTEX_BUFFER_VIEW billboardVBV =
+		m_billboardMesh.VertexBufferView();
+
+
+	m_commandList->IASetVertexBuffers(
+		0,
+		1,
+		&billboardVBV
+	);
+
+
+	m_commandList->IASetIndexBuffer(
+		nullptr
+	);
+
+
+	m_commandList->IASetPrimitiveTopology(
+		D3D11_PRIMITIVE_TOPOLOGY_POINTLIST
+	);
+
+
+	m_commandList->DrawInstanced(
+		static_cast<UINT>(
+			m_billboardMesh.NumberOfVertices
+			),
+		1,
+		0,
+		0
+	);
 
 	// =====================================================
 	// Shadow map becomes readable by main pass

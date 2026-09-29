@@ -114,6 +114,17 @@ namespace Geometry
 		};
 	}
 
+	inline VertexBuffer CreateBillboardPoints()
+	{
+		return
+		{
+			Vertex(
+				DirectX::XMFLOAT3(0.0f, 0.0f, 0.0f),
+				DirectX::XMFLOAT2(0.0f, 0.0f)
+			)
+		};
+	}
+
 	inline DirectX::XMFLOAT4X4 Identity4x4()
 	{
 		static DirectX::XMFLOAT4X4 I(

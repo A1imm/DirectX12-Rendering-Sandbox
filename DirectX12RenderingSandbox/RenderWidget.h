@@ -166,6 +166,11 @@ private:
     Microsoft::WRL::ComPtr<ID3DBlob> m_shadowTerrainHullShaderByteCode;
     Microsoft::WRL::ComPtr<ID3DBlob> m_shadowTerrainDomainShaderByteCode;
 
+    // Billboard pipeline
+    Microsoft::WRL::ComPtr<ID3DBlob> m_billboardVertexShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_billboardGeometryShaderByteCode;
+    Microsoft::WRL::ComPtr<ID3DBlob> m_billboardPixelShaderByteCode;
+
     // Pipeline states and Root signature
     void BuildRootSignature();
     void CreateGraphicPipelines();
@@ -175,7 +180,7 @@ private:
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_tessellationPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowBasicPipelineState;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_shadowTerrainPipelineState;
-
+    Microsoft::WRL::ComPtr<ID3D12PipelineState> m_billboardPipelineState;
 
     // Textures
     struct TextureResource
@@ -264,6 +269,7 @@ private:
 
     MeshBuffer m_basicMesh;
     MeshBuffer m_tessellationMesh;
+    MeshBuffer m_billboardMesh;
 };
 
 #endif
