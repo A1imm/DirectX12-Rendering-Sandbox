@@ -218,9 +218,6 @@ void System::OnMouseMove(WPARAM btnState, int x, int y)
 		// Update angles based on input to orbit camera around box.
 		m_renderWidget->GetCamera().Theta += dx;
 		m_renderWidget->GetCamera().Phi += dy;
-
-		// Restrict the angle mPhi.
-		//mPhi = MathHelper::Clamp(mPhi, 0.1f, MathHelper::Pi - 0.1f);
 	}
 	else if ((btnState & MK_RBUTTON) != 0)
 	{

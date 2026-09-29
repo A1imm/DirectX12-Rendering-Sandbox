@@ -67,6 +67,9 @@
     <CopyFileToFolders Include="ShaderConstants.hlsli">
       <Filter>Resources</Filter>
     </CopyFileToFolders>
+    <CopyFileToFolders Include="ShadowCommon.hlsli">
+      <Filter>Resources</Filter>
+    </CopyFileToFolders>
     <CopyFileToFolders Include="height_map.png">
       <Filter>Resources</Filter>
     </CopyFileToFolders>

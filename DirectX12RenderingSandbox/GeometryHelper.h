@@ -186,10 +186,17 @@ namespace Geometry
 			return DirectX::XMFLOAT3(x, y, z);
 		}
 
-		void UpdateProjetionMatrix()
+		void UpdateProjectionMatrix()
 		{
-			const auto aspectRation = Width / Height;
-			DirectX::XMMATRIX proj = DirectX::XMMatrixPerspectiveFovLH(0.25f * static_cast<float>(M_PI), aspectRation, 1.0f, 1000.0f);
+			const auto aspectRatio =
+				Width / Height;
+			DirectX::XMMATRIX proj =
+				DirectX::XMMatrixPerspectiveFovLH(
+					0.25f * static_cast<float>(M_PI),
+					aspectRatio,
+					1.0f,
+					1000.0f
+				);
 			DirectX::XMStoreFloat4x4(&m_proj, proj);
 		}
 	private:

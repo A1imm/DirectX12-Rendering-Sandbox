@@ -63,7 +63,7 @@ void RenderWidget::Initialize()
 
 	//3. Initialize Graphic Pipeline
 	BuildRootSignature();
-	CreateGraphicPipelines();
+	CreateGraphicsPipelines();
 
 	//4. Execute all commands
 	ExecuteCommandList();
@@ -99,7 +99,7 @@ void RenderWidget::Resize(int width, int height)
 	//Update projection matrix and viewport
 	m_camera.Width = static_cast<float>(width);
 	m_camera.Height = static_cast<float>(height);
-	m_camera.UpdateProjetionMatrix();
+	m_camera.UpdateProjectionMatrix();
 	UpdateViewport(width, height);
 
 	m_width = width;
@@ -602,7 +602,7 @@ void RenderWidget::BuildRootSignature()
 	// b0 - per-object data
 	slotRootParameter[0].InitAsConstantBufferView(0);
 
-	// t0-t2 - textures
+	// t0-t5 - shader resource views
 	slotRootParameter[1].InitAsDescriptorTable(
 		1,
 		&resourceTable
@@ -613,7 +613,7 @@ void RenderWidget::BuildRootSignature()
 
 	CD3DX12_STATIC_SAMPLER_DESC samplers[2];
 
-	// Normal texture sampler - s0
+	// General texture sampler - s0
 	samplers[0] =
 		CD3DX12_STATIC_SAMPLER_DESC(
 			0,
@@ -656,12 +656,18 @@ void RenderWidget::BuildRootSignature()
 	}
 	assert(SUCCEEDED(hr));
 
-	HRESULT result = m_dxDevice->CreateRootSignature(
-		0,
-		serializedRootSig->GetBufferPointer(),
-		serializedRootSig->GetBufferSize(),
-		IID_PPV_ARGS(m_rootSignature.GetAddressOf()));
-	assert(SUCCEEDED(hr));
+	HRESULT result =
+		m_dxDevice->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(
+				m_rootSignature.GetAddressOf()
+			)
+		);
+
+	assert(SUCCEEDED(result));
+	ThrowIfFailed(result);
 }
 
 void RenderWidget::CompileShaders()
@@ -1160,7 +1166,7 @@ void RenderWidget::LoadTexture(
 	);
 }
 
-void RenderWidget::CreateGraphicPipelines()
+void RenderWidget::CreateGraphicsPipelines()
 {
 	std::vector<D3D12_INPUT_ELEMENT_DESC> basicInputLayout =
 	{
@@ -2126,7 +2132,9 @@ void RenderWidget::ToggleTerrainWireframe()
 
 void RenderWidget::Draw()
 {
-	m_directCmdListAlloc->Reset();
+	ThrowIfFailed(
+		m_directCmdListAlloc->Reset()
+	);
 
 	ResetCommandList(
 		m_shadowBasicPipelineState.Get()
@@ -2283,7 +2291,8 @@ void RenderWidget::Draw()
 		m_cbWVProjectionMatrix
 		->GetGPUVirtualAddress()
 		+
-		static_cast<UINT>(ObjectSlot::Terrain) * m_objectConstantBufferByteSize;
+		static_cast<UINT>(ObjectSlot::Terrain) *
+		m_objectConstantBufferByteSize;
 
 	m_commandList->SetGraphicsRootConstantBufferView(
 		0,
@@ -2311,8 +2320,8 @@ void RenderWidget::Draw()
 	);
 
 	// =====================================================
-// BILLBOARDS - GEOMETRY SHADER PIPELINE
-// =====================================================
+	// BILLBOARDS - GEOMETRY SHADER PIPELINE
+	// =====================================================
 
 	m_commandList->SetPipelineState(
 		m_billboardPipelineState.Get()

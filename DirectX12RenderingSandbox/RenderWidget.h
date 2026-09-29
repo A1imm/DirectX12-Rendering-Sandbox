@@ -198,7 +198,7 @@ private:
 
     // Pipeline states and Root signature
     void BuildRootSignature();
-    void CreateGraphicPipelines();
+    void CreateGraphicsPipelines();
 
     Microsoft::WRL::ComPtr<ID3D12RootSignature> m_rootSignature;
     Microsoft::WRL::ComPtr<ID3D12PipelineState> m_basicPipelineState;
